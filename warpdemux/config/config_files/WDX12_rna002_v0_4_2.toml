@@ -1,0 +1,62 @@
+[llr_boundaries]
+sig_norm_winsor_window = 5
+sig_norm_outlier_thresh = 5.0
+min_obs_adapter = 2500
+max_obs_trace = 8000
+adapter_trace_tail_trim = 5
+adapter_trace_stride = 40
+min_obs_polya = 100
+polya_trace_start = 40
+polya_trace_stride = 10
+adapter_trace_early_stop_window = 2000
+adapter_trace_early_stop_stride = 1000
+polya_trace_early_stop_window = 200
+polya_trace_early_stop_stride = 40
+adapter_peak_prominence = 1.0
+adapter_peak_rel_height = 1.0
+adapter_peak_width = 1500
+polya_peak_prominence = 1.0
+polya_peak_rel_height = 0.5
+polya_peak_width = 50
+refine_polya_atol = 20
+refine_smooth_sigma = 10
+
+[mvs_polya]
+mvs_detect_check = true
+mvs_detect_overwrite = true
+search_window = 500
+pA_mean_window = 20
+pA_var_window = 100
+pA_var_range = [-inf, 20.0]
+median_shift_range = [5.0, inf]
+median_shift_window = 1000
+polyA_window = 100                           # should reflect llr min_obs_polya
+polyA_med_range = [-inf, inf]
+polyA_local_range = [0.0, 10.0]
+pA_mean_adapter_med_scale_range = [1.3, inf]
+
+[real_range]
+detect_open_pores = false
+real_signal_check = true
+mean_window = 300
+mean_start_range = [-inf, inf]
+mean_end_range = [-inf, inf]
+max_obs_local_range = 5000
+local_range = [7.0, 35.0]
+adapter_mad_range = [3.0, 12.0]
+
+[sig_norm]
+winsor_window = 5
+outlier_thresh = 5.0
+
+[sig_extract]
+padding = 100
+normalization = "none"
+
+[segmentation]
+min_obs_per_base = 15
+running_stat_width = 30
+num_events = 110
+normalization = "mean"
+barcode_num_events = 25
+accept_less_cpts = false

@@ -1,0 +1,35 @@
+[WDX4_rna002_v0_4_0]
+num_bcs = 4
+SQK = "RNA002"
+WDX_version = "0.4.0"
+spc = "rna002_v0_4_2"
+
+[WDX6_rna002_v0_4_0]
+num_bcs = 6
+SQK = "RNA002"
+WDX_version = "0.4.0"
+spc = "rna002_v0_4_2"
+
+[WDX8_rna002_v0_4_0]
+num_bcs = 8
+SQK = "RNA002"
+WDX_version = "0.4.0"
+spc = "rna002_v0_4_2"
+
+[WDX10_rna002_v0_4_0]
+num_bcs = 10
+SQK = "RNA002"
+WDX_version = "0.4.0"
+spc = "rna002_v0_4_2"
+
+[WDX12_rna002_v0_4_2]
+num_bcs = 12
+SQK = "RNA002"
+WDX_version = "0.4.2"
+spc = "rna002_v0_4_2"
+spc_live = "rna002_v0_4_2_live"
+[WDX-DPC_rna002_v0_4_0]
+num_bcs = 4
+SQK = "RNA002"
+WDX_version = "0.4.0"
+spc = "rna002_v0_4_2"

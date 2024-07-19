@@ -1,0 +1,62 @@
+# See README for instructions on possible configurations
+[model]
+model_name = "WDX12_rna002_v0_4_2"
+
+[flowcell]
+flowcell_type = "flongle"
+
+
+[[balancers]]
+balance_threshold = 0.05
+min_stat = 100
+balance_type = "read_count"
+pod5_watch_dir = "warpdemux/live_balancing/test"
+channel_frac = 0.2
+pod5_check_interval = 0.5
+
+[[balancers]]
+balance_threshold = 0.05
+min_stat = 100
+balance_type = "base_normalization"
+pod5_watch_dir = "warpdemux/live_balancing/test"
+channel_frac = 0.2
+pod5_check_interval = 0.5
+
+[[balancers]]
+balance_threshold = 0.05
+min_stat = 100
+balance_type = "adapter_count"
+channel_frac = 0.2
+
+watch_for_missing = true
+wait_to_see = 300
+
+watch_barcode00 = false
+watch_barcode11 = false
+
+[[balancers]]
+balance_threshold = 0.05
+min_stat = 100
+balance_type = "none"
+channel_frac = 0.2
+
+[[balancers]]
+balance_threshold = 0.05
+min_stat = 100
+balance_type = "reject_all"
+channel_frac = 0.2
+
+[processing]
+nproc_segmentation = 2
+nproc_classification = 4
+
+[acquisition]
+max_missed_start_offset = 400
+max_chunk_size = 12000
+
+[balancing]
+pred_conf_threshold = 0.2
+
+[reporting]
+save_every_sec = 5
+save_path = "results"

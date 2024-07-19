@@ -1,0 +1,3 @@
+[submodule "wardemux/adapted"]
+	path = warpdemux/adapted
+	url = https://github.com/wvdtoorn/ADAPTed.git
