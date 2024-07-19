@@ -253,3 +253,7 @@ This project, with the exeption of the `segmentation` and `read_until` module, i
   - Licensed under the MIT License. Full license text available at [MIT License](https://opensource.org/licenses/MIT).
 
 Please ensure compliance with each license's terms and conditions.
+
+### Patent Information
+
+An international priority patent application was filed jointly by RKI, HZI and FU Berlin on April 26, 2024, at the European Patent Office (EPO) under number PCT/EP2024/061629.
