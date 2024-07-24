@@ -1,0 +1,286 @@
+type = "fragment"
+
+# Groups allow a shorter GUI view. channel states in the same group can aggregate statistics
+[analysis_configuration.channel_states.groups.sequencing]
+description = "Pore currently sequencing"
+
+[analysis_configuration.channel_states.groups.sequencing.style]
+label = "Sequencing"
+order = 1
+colour = "00ff00"
+
+
+[analysis_configuration.channel_states.groups.pore]
+description = "Pore available for sequencing"
+
+[analysis_configuration.channel_states.groups.pore.style]
+label = "Pore available"
+order = 2
+colour = "00cc00"
+
+
+[analysis_configuration.channel_states.groups.recovering]
+description = "Pore currently unavailable for sequencing"
+
+[analysis_configuration.channel_states.groups.recovering.style]
+label = "Unavailable"
+order = 3
+colour = "0084a9"
+
+
+[analysis_configuration.channel_states.groups.inactive]
+description = "Pore no longer suitable for further sequencing"
+
+[analysis_configuration.channel_states.groups.inactive.style]
+label = "Inactive"
+order = 4
+colour = "90c6e7"
+
+
+[analysis_configuration.channel_states.saturated]
+description = "The channel has switched off as current levels exceed hardware limitations"
+group = "inactive"
+[analysis_configuration.channel_states.saturated.style]
+order = 13
+label = "Saturated"
+colour = "68767E"
+[analysis_configuration.channel_states.saturated.logic]
+rank = 0 # evaluation order
+criteria = "saturated_until_switched_from_open_pore"
+[analysis_configuration.channel_states.saturated.logic.behaviour]
+reset_on_effective_mux_change = true
+
+
+# This channel state is used for indicating inactive channels defined by the mux scan
+# If a channel enters this state, the previous mux scan has not found any usable wells.
+[analysis_configuration.channel_states.no_pore]
+description = "No pore detected in channel"
+group = "inactive"
+[analysis_configuration.channel_states.no_pore.style]
+order = 10
+colour = '90C6E7'
+label = "No pore"
+[analysis_configuration.channel_states.no_pore.logic]
+rank = 14
+criteria = "never_evaluated"
+
+
+[analysis_configuration.channel_states.unblocking]
+description = "Channel ejecting analyte"
+group = "recovering"
+[analysis_configuration.channel_states.unblocking.style]
+order = 8
+label = "Active feedback"
+colour = "A53F97"
+[analysis_configuration.channel_states.unblocking.logic]
+rank = 1
+criteria = "unblocking"
+[analysis_configuration.channel_states.unblocking.logic.behaviour]
+reset_on_mux_change = true
+
+
+[analysis_configuration.channel_states.multiple]
+description = "Multiple pores detected. Unavailable for sequencing."
+group = "inactive"
+[analysis_configuration.channel_states.multiple.style]
+order = 14
+label = "Multiple"
+colour = "F57E20"
+[analysis_configuration.channel_states.multiple.logic]
+rank = 2
+criteria = "read_classification_sequence"
+pattern = "(.*<multiple>.*<multiple>)"
+[analysis_configuration.channel_states.multiple.logic.behaviour]
+latch = true
+reset_on_well_change = true
+
+
+[analysis_configuration.channel_states.polya]
+description = "Pore currently sequencing poly A"
+group = "sequencing"
+[analysis_configuration.channel_states.polya.style]
+order = 3
+label = "Poly A"
+colour = "F79A72"
+[analysis_configuration.channel_states.polya.logic]
+rank = 3
+criteria = "read_classification_sequence"
+pattern = "(<adapter>(<strand>|<strand_low_range>){0,3}(<unknown_positive>){0,3}(<strand>|<strand_low_range>){0,3}(<polya>+(<stalled>|<unknown_positive>|<strand>|<strand_low_range>){0,1})+)"
+[analysis_configuration.channel_states.polya.logic.behaviour]
+reset_on_mux_change = true
+
+
+[analysis_configuration.channel_states.long_stalled]
+description = "Channel stalled for long duration"
+group = "recovering"
+[analysis_configuration.channel_states.long_stalled.style]
+order = 6
+label = "Long Stalled"
+colour = "AD433B"
+[analysis_configuration.channel_states.long_stalled.logic]
+rank = 4
+criteria = "read_classification_sequence"
+pattern = "((<stalled>){10,})"
+[analysis_configuration.channel_states.long_stalled.logic.behaviour]
+reset_on_mux_change = true
+
+
+[analysis_configuration.channel_states.strand]
+description = "Pore currently sequencing RNA"
+group = "sequencing"
+[analysis_configuration.channel_states.strand.style]
+order = 4
+label = "Sequencing"
+colour = "00FF00"
+[analysis_configuration.channel_states.strand.logic]
+rank = 8
+criteria = "read_classification_sequence"
+pattern = "((((<strand>|<strand_low_range>){20,})|(<polya>|<adapter>))(<unknown_positive>){0,3}((<strand>|<strand_low_range>)+((<stalled>){0,2}|<unknown_positive>|<polya>|<adapter>){0,2})+)"
+[analysis_configuration.channel_states.strand.logic.behaviour]
+reset_on_mux_change = true
+
+[analysis_configuration.channel_states.blocked]
+description = "Channel blocked"
+group = "recovering"
+[analysis_configuration.channel_states.blocked.style]
+order = 7
+label = "Blocked"
+colour = "FA6AB0"
+[analysis_configuration.channel_states.blocked.logic]
+rank = 5
+criteria = "read_classification_sequence"
+pattern = "((((<unknown_positive>(<strand>|<polya>)?)|(<polya>(<strand>)?)|(<stalled>(<strand>|<polya>)?)|(<strand_low_range><strand_low_range>))){10,}(<strand_low_range>)?)"
+[analysis_configuration.channel_states.blocked.logic.behaviour]
+reset_on_mux_change = true
+
+
+[analysis_configuration.channel_states.stalled]
+description = "Motor protein stalled"
+group = "sequencing"
+[analysis_configuration.channel_states.stalled.style]
+order = 5
+label = "Stalled"
+colour = "36CFD1"
+[analysis_configuration.channel_states.stalled.logic]
+rank = 6
+criteria = "read_classification_sequence"
+pattern = "((<stalled>){3,})"
+[analysis_configuration.channel_states.stalled.logic.behaviour]
+reset_on_mux_change = true
+
+
+[analysis_configuration.channel_states.adapter]
+description = "Pore currently sequencing adapter"
+group = "sequencing"
+[analysis_configuration.channel_states.adapter.style]
+order = 2
+label = "Adapter"
+colour = "EDE797"
+[analysis_configuration.channel_states.adapter.logic]
+rank = 7
+criteria = "read_classification_sequence"
+pattern = "((<pore>|<unknown_positive>)<adapter>(<adapter>(<unknown_positive>|<strand>|<strand_low_range>){0,3})+)"
+[analysis_configuration.channel_states.adapter.logic.behaviour]
+reset_on_mux_change = true
+
+
+[analysis_configuration.channel_states.pore]
+description = "Pore available for sequencing"
+group = "pore"
+[analysis_configuration.channel_states.pore.style]
+order = 1
+label = "Pore available"
+colour = "00CC00"
+[analysis_configuration.channel_states.pore.logic]
+rank = 9
+criteria = "read_classification_sequence"
+pattern = "((<pore><event>)|(<pore>(<unavailable_low>|<unavailable_high>){0,3}}<pore>))"
+[analysis_configuration.channel_states.pore.logic.behaviour]
+reset_on_mux_change = true
+
+
+[analysis_configuration.channel_states.unavailable]
+description = "Pore unavailable for sequencing"
+group = "recovering"
+[analysis_configuration.channel_states.unavailable.style]
+order = 9
+label = "Unavailable"
+colour = "54B8B1"
+[analysis_configuration.channel_states.unavailable.logic]
+rank = 10
+criteria = "read_classification_sequence"
+pattern = "((<unavailable_high>){3,}|(<unavailable_low>){3,}|<pore_1>)"
+[analysis_configuration.channel_states.unavailable.logic.behaviour]
+reset_on_mux_change = true
+
+
+[analysis_configuration.channel_states.zero]
+description = "Pore currently unavailable for sequencing"
+group = "inactive"
+[analysis_configuration.channel_states.zero.style]
+order = 15
+label = "Zero"
+colour = "4DA9C3"
+[analysis_configuration.channel_states.zero.logic]
+rank = 11
+pattern = "<zero><zero>"
+criteria = "read_classification_sequence"
+[analysis_configuration.channel_states.zero.logic.behaviour]
+reset_on_mux_change = true
+
+
+[analysis_configuration.channel_states.unknown_positive]
+description = "Current is positive but unavailable for sequencing"
+group = "inactive"
+[analysis_configuration.channel_states.unknown_positive.style]
+order = 11
+label = "Out of range-high"
+colour = "0084A9"
+[analysis_configuration.channel_states.unknown_positive.logic]
+rank = 12
+classification = "unknown_positive"
+criteria = "has_read_classification"
+[analysis_configuration.channel_states.unknown_positive.logic.behaviour]
+reset_on_mux_change = true
+
+
+[analysis_configuration.channel_states.unknown_negative]
+description = "Current is negative but unavailable for sequencing"
+group = "inactive"
+[analysis_configuration.channel_states.unknown_negative.style]
+order = 12
+label = "Out of range-low"
+colour = "B5AEA7"
+[analysis_configuration.channel_states.unknown_negative.logic]
+rank = 13
+classification = "unknown_negative"
+criteria = "has_read_classification"
+[analysis_configuration.channel_states.unknown_negative.logic.behaviour]
+reset_on_mux_change = true
+
+
+# This channel state is used for communicating active channel swapping
+# If a channel enters this state, it's eligible to be swapped out if possible
+[analysis_configuration.channel_states.locked]
+description = "Channel manually locked"
+group = "unclassified"
+[analysis_configuration.channel_states.locked.style]
+order = 17
+label = "Pending reselection"
+colour = "CCD5D8"
+[analysis_configuration.channel_states.locked.logic]
+rank = 15
+criteria = "never_evaluated"
+
+
+# This channel state is used for exhausted channels
+[analysis_configuration.channel_states.disabled]
+description = "Channel is disabled and awaiting another pore scan"
+group = "inactive"
+[analysis_configuration.channel_states.disabled.style]
+order = 16
+label = "Channel disabled"
+colour = "CCD5D8"
+[analysis_configuration.channel_states.disabled.logic]
+rank = 16
+criteria = "never_evaluated"
