@@ -250,8 +250,8 @@ The WarpDemuX segmentation module is based on code from tombo (<https://github.c
 This project, with the exeption of the `segmentation` and `read_until` module, is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0). You can view the full text of the license at the following link:
 <https://creativecommons.org/licenses/by-nc/4.0/legalcode>
 
-- The files in `warpdemux/segmentation` are licensed under the terms of the Mozilla Public License 2.0 (MPL 2.0).
-- The files in `warpdemux/read_until` are licensed under the terms of the Mozilla Public License 2.0 (MPL 2.0).
+- The code in `warpdemux/segmentation` is licensed under the terms of the Mozilla Public License 2.0 (MPL 2.0).
+- The code in `warpdemux/read_until` is licensed under the terms of the Mozilla Public License 2.0 (MPL 2.0).
 
 ### Dependencies Licenses
 
