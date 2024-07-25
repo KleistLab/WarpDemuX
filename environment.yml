@@ -12,7 +12,7 @@ dependencies:
       - minknow-api==5.7.2
       - pod5
       - vbz-h5py-plugin
-  - dtaidistance
+  - dtaidistance=2.3.11
   - scikit-learn=1.3.1
   - scipy
   - cython=0.29.36
