@@ -20,14 +20,17 @@ ext_modules = [
 for e in ext_modules:
     e.cython_directives = {"embedsignature": True}
 
-
 setup(
     name="WarpDemuX",
-    version=VERSION,
+    version=verstr,
     packages=find_packages(),
     author="Wiep van der Toorn",
     author_email="w.vandertoorn@fu-berlin.de",
     include_package_data=True,
+    package_data={
+        "warpdemux.config": ["config_files/*.toml"],
+        "warpdemux.models": ["model_files/*.toml", "model_files/*.joblib"],
+    },
     ext_modules=cythonize(ext_modules, language_level="3"),
     cmdclass={"build_ext": build_ext},
     entry_points={"console_scripts": ["warpdemux = warpdemux.main:main"]},
