@@ -18,6 +18,7 @@ from warpdemux.config.classification import ClassificationConfig
 from warpdemux.config.config import Config
 from warpdemux.config.file_proc import InputConfig, OutputConfig, ResegmentTaskConfig
 from warpdemux.config.sig_proc import SigProcConfig
+from warpdemux._version import __version__
 
 # TODO, change to use default values depending on SQK...
 SPC = SigProcConfig()  # default values
@@ -237,7 +238,12 @@ def parse_args() -> Tuple[str, Config]:
 
     # create run dir
     if args.create_subdir:
-        run_dir_name = "warpdemux_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        run_dir_name = (
+            "warpdemux_"
+            + __version__.replace(".", "_")
+            + "_"
+            + datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        )
         run_dir = os.path.join(args.output, run_dir_name)
     else:
         run_dir = args.output
