@@ -7,3 +7,4 @@ Contact: w.vandertoorn@fu-berlin.de
 """
 
 # required form importlib.resources logic
+speeds = {"rna002": "70bps", "rna004": "130bps"}

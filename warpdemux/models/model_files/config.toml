@@ -26,8 +26,9 @@ spc = "rna002_v0_4_2"
 num_bcs = 12
 SQK = "RNA002"
 WDX_version = "0.4.2"
-spc = "rna002_v0_4_2"
-spc_live = "rna002_v0_4_2_live"
+spc = "rna002_70bps@v0.4.2"
+spc_live = "rna002_70bps@v0.4.2_live"
+
 [WDX-DPC_rna002_v0_4_0]
 num_bcs = 4
 SQK = "RNA002"

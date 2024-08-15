@@ -12,7 +12,7 @@ from adapted.config.file_proc import (
 )
 from adapted.io_utils import input_to_filelist
 
-from warpdemux.config.utils import get_model_spc_config
+from warpdemux.config.utils import get_model_spc_config, get_chemistry_specific_config
 
 from warpdemux.config.classification import ClassificationConfig
 from warpdemux.config.config import Config
@@ -121,8 +121,14 @@ for _parser in [fpts_parser, reseg_parser]:
     _parser.add_argument(
         "--config",
         type=str,
-        required=True,
-        help="Path to a valid signal processing configuration toml to use.",
+        help="Path to a valid configuration toml to use. See warpdemux/config/config_files/ for options.",
+    )
+
+    _parser.add_argument(
+        "--chemistry",
+        type=str,
+        choices=["RNA002", "RNA004"],
+        help="Specify the chemistry to use. If provided, --config is not required and will be ignored if both are provided.",
     )
 
 for _parser in [fpts_parser, demux_parser]:
@@ -197,6 +203,10 @@ demux_parser.add_argument(
 
 def parse_args() -> Tuple[str, Config]:
     args = parser.parse_args()
+
+    if args.command == "fpts" or args.command == "resegment":
+        if not args.config and not args.chemistry:
+            parser.error("Either --config or --chemistry must be provided.")
 
     read_ids = []
     prev_results = []
@@ -297,7 +307,13 @@ def parse_args() -> Tuple[str, Config]:
             num_proc=args.num_proc,
         )
     else:
-        spc = load_nested_config_from_file(args.config, SigProcConfig)
+        if args.config:
+            # TODO: document that the provided config file should also include the adapted config sections!
+            spc = load_nested_config_from_file(args.config, SigProcConfig)
+        else:
+            spc = get_chemistry_specific_config(
+                args.chemistry, load_adapted_config_first=True
+            )
         cc = None
 
     config = Config(

@@ -24,7 +24,7 @@ from warpdemux.config.sig_proc import SigProcConfig
 from warpdemux import __version__
 
 
-# TODO: update model naming to WDX[xx]_rna00[x]_130bps@v[x].[x].[x]
+# TODO: update model naming to WDX[xx]_rna00[x]_xxbps@v[x].[x].[x]
 def get_model_spc_config(model_name: str) -> SigProcConfig:
     with pkg_resources.path(model_files, "config.toml") as config_path:
         model_config = toml.load(config_path)[model_name]
@@ -58,7 +58,9 @@ def chemistry_specific_config_name(
 ) -> str:
     if version is None:
         version = __version__
-    return f"{chemistry.lower()}@v{version}"
+    speed = config_files.speeds[chemistry.lower()]
+
+    return f"{chemistry.lower()}_{speed}@v{version}"
 
 
 def get_chemistry_specific_config(
