@@ -46,9 +46,9 @@ def resegment_wrapper(
         )
         proc_res.set_read_id(read_id)
         return proc_res
-    except:
+    except Exception as e:
         # shouldn't happen, errors should be caught earlier and result in empty fpt
-        print(f"Failed on read {read_id}")
+        print(f"Failed on read {read_id}: {e}")
         traceback.print_exc()
         return ReadResult(read_id=read_id, success=False, fail_reason="unknown")
 
@@ -74,9 +74,9 @@ def barcode_fpt_wrapper(
         proc_res.set_read_id(read_id)
         return proc_res
 
-    except:
+    except Exception as e:
         # shouldn't happen, errors should be caught earlier and result in empty fpt
-        print(f"Failed on read {read_id}")
+        print(f"Failed on read {read_id}: {e}")
         traceback.print_exc()
         return ReadResult(read_id=read_id, success=False, fail_reason="unknown")
 
