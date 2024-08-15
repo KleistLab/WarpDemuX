@@ -7,7 +7,7 @@ from adapted.file_proc.file_proc import get_file_read_id_map, process
 from adapted.io_utils import lexsort_num_suffix
 from tqdm import tqdm
 
-import warpdemux
+import warpdemux  # sets adapted submodule path for editable install
 from warpdemux.file_proc import (
     barcode_fpt_wrapper,
     load_model,
