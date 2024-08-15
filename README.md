@@ -15,7 +15,7 @@ mamba env create -n WDX -f [path/to/store/WarpDemuX]/environment.yml
 conda activate WDX
 ```
 
-WarpDemuX depends on ADAPTed, our tool for adapter and poly(A) tail detection. ADAPTed is included as a submodule for now. To make sure WDX can access this module correctly, you need to install WDX in editeable mode. This can be done by using pip's `-e` flag:
+WarpDemuX depends on ADAPTed, our tool for adapter and poly(A) tail detection. ADAPTed is included as a submodule for now. To make sure WDX can access this module correctly, you need to install WDX in editable mode. This can be done by using pip's '-e' flag:
 
 ```
 pip install -e [path/to/store/WarpDemuX]
@@ -23,6 +23,16 @@ pip install -e [path/to/store/WarpDemuX]
 # or, for barcode-specific adaptive sampling
 cd [path/to/store/WarpDemuX]
 pip install -e '.[live-demux]'
+```
+
+Alternatively, if you don't wish to install in editable mode, you can install the warpdemux and adapted packages separately:
+
+```
+cd [path/to/store/WarpDemuX]
+pip install .
+
+cd warpdemux/adapted
+pip install .
 ```
 
 ## Usage
