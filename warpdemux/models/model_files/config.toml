@@ -29,6 +29,13 @@ WDX_version = "0.4.2"
 spc = "rna002_70bps@v0.4.2"
 spc_live = "rna002_70bps@v0.4.2_live"
 
+[WDX12_rna002_v0_4_3]
+num_bcs = 12
+SQK = "RNA002"
+WDX_version = "0.4.3"
+spc = "rna002_70bps@v0.4.3"
+spc_live = "rna002_70bps@v0.4.3_live"
+
 [WDX-DPC_rna002_v0_4_0]
 num_bcs = 4
 SQK = "RNA002"
