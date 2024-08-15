@@ -315,6 +315,8 @@ def parse_args() -> Tuple[str, Config]:
             )
         cc = None
 
+    spc.update_sig_preload_size()
+
     config = Config(
         input=input_config,
         task=task_config,
