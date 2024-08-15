@@ -166,7 +166,6 @@ reseg_parser.add_argument(
     help=(
         "Directory or path(s) to csv file(s) with previous detection results to be processed. "
         "This should be the 'detected_boundaries_[batch_id].csv' files from a previous run. "
-        "If left empty, the script will search for them in the input directory."
     ),
 )
 
