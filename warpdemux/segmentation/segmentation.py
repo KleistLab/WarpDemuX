@@ -20,68 +20,29 @@ This file is licensed under the Mozilla Public License 2.0 (MPL 2.0).
 ---------------------------------------------------------------------------------
 """
 
-from typing import Literal, Tuple, Union, overload
-
 import numpy as np
 import pyximport
 
 pyximport.install(setup_args={"include_dirs": np.get_include()})
-from ._c_segmentation import c_new_means, c_valid_cpts_w_cap_t_test
+from ._c_segmentation import c_new_means, c_windowed_t_test
 
 
-@overload
-def valid_cpts_w_cap_t_test(
-    raw_signal: np.ndarray,
-    min_obs_per_base: int,
-    running_stat_width: int,
-    num_events: int,
-    accept_less_cpts: bool,
-    return_scores: Literal[False],
-) -> np.ndarray: ...
-
-
-@overload
-def valid_cpts_w_cap_t_test(
-    raw_signal: np.ndarray,
-    min_obs_per_base: int,
-    running_stat_width: int,
-    num_events: int,
-    accept_less_cpts: bool,
-    return_scores: Literal[True],
-) -> Tuple[np.ndarray, np.ndarray]: ...
-
-
-def valid_cpts_w_cap_t_test(
+def windowed_t_test(
     raw_signal: np.ndarray,
     min_obs_per_base: int = 15,
     running_stat_width: int = 30,
-    num_events: int = 110,
-    accept_less_cpts=False,
-    return_scores=False,
-) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+) -> np.ndarray:
     try:
-        out = c_valid_cpts_w_cap_t_test(
+        t_scores = c_windowed_t_test(
             raw_signal.astype(np.float64),
             min_obs_per_base,
             running_stat_width,
-            num_events,
-            accept_less_cpts=accept_less_cpts,
-            return_scores=return_scores,
         )
-        if return_scores:
-            valid_cpts, t_scores = out
-            return valid_cpts, t_scores
-        else:
-            valid_cpts = out
-            return valid_cpts
+        return t_scores
 
     except Exception as e:
         print(e)
-        return (
-            np.zeros(0, dtype=int)
-            if not return_scores
-            else (np.zeros(0, dtype=int), np.zeros(0, dtype=np.float64))
-        )
+        return np.zeros(0, dtype=int)
 
 
 def compute_base_means(raw_signal: np.ndarray, base_starts: np.ndarray) -> np.ndarray:

@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 import numpy as np
+from scipy.signal import find_peaks
+
 from adapted.detect.combined import DetectResults, combined_detect
 from adapted.file_proc.file_proc import (
     ReadResult as AdaptedReadResult,
@@ -12,7 +14,7 @@ from warpdemux.segmentation.segmentation import (
     compute_base_means,
     identify_stalls,
     remove_stall_cpts,
-    valid_cpts_w_cap_t_test,
+    windowed_t_test,
 )
 
 DetectResults = DetectResults
@@ -213,7 +215,7 @@ def segment_signal(
     accept_less_cpts=False,
 ):
     """
-    Segment the given raw signal using the `c_valid_cpts_w_cap_t_test` function.
+    Segment the given raw signal using the `c_windowed_t_test` function.
 
     If segmentation is not possible due to a NotImplementedError, an empty array is returned.
 
@@ -223,34 +225,34 @@ def segment_signal(
         The raw signal array to be segmented.
 
     min_obs_per_base : int, optional
-        Minimum observations per base. Default is 6.
+        Minimum observations per base.
 
     running_stat_width : int, optional
-        Width for the running statistic. Default is 12.
+        Width for the running statistic.
 
     num_events : int, optional
-        The desired number of events. Default is 110.
+        The desired number of events.
 
     remove_stalls : bool, optional
-        Whether to remove stall points from the valid points. Default is True.
+        Whether to remove stall points from the valid points.
 
     stall_window_size : int, optional
-        The size of the window used for imputation of outliers. Default is 350.
+        The size of the window used for imputation of outliers.
 
     stall_threshold : int, optional
-        The threshold for stall detection. Default is 40.
+        The threshold for stall detection.
 
     stall_edge_buffer : int, optional
-        The buffer to add to the edge of the window for stall detection. Default is 100.
+        The buffer to add to the edge of the window for stall detection.
 
     stall_min_consecutive_obs : int, optional
-        The minimum number of consecutive observations to consider a stall. Default is 200.
+        The minimum number of consecutive observations to consider a stall.
 
     stall_n_windows : int, optional
-        The number of windows to use for stall detection. Default is 7.
+        The number of windows to use for stall detection.
 
     stall_mini_window_size : int, optional
-        The size of the mini window used for stall detection. Default is 50.
+        The size of the mini window used for stall detection.
 
     Returns:
     -------
@@ -258,17 +260,17 @@ def segment_signal(
         Array containing segmented, normalized signal values.
     """
 
-    valid_cpts = valid_cpts_w_cap_t_test(
+    scores = windowed_t_test(
         raw_signal,
         min_obs_per_base=min_obs_per_base,
         running_stat_width=running_stat_width,
-        num_events=num_events,
-        accept_less_cpts=accept_less_cpts,
-        return_scores=False,
     )
-    if valid_cpts.size == 0:
+    peaks, _ = find_peaks(scores, distance=min_obs_per_base)
+
+    if peaks.size < num_events and not accept_less_cpts:
         return np.array([])
 
+    valid_cpts = peaks[np.argsort(scores[peaks])[-num_events:]] + running_stat_width
     valid_cpts.sort()
 
     if remove_stalls:
