@@ -20,9 +20,6 @@ from warpdemux.config.file_proc import InputConfig, OutputConfig, ResegmentTaskC
 from warpdemux.config.sig_proc import SigProcConfig
 from warpdemux._version import __version__
 
-# TODO, change to use default values depending on SQK...
-SPC = SigProcConfig()  # default values
-
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -183,8 +180,8 @@ demux_parser.add_argument(
 demux_parser.add_argument(
     "--model_name",
     type=str,
-    default="WDX12_rna002_v0_4_2",
-    help="Name of the model to use for classification. Default is `WDX12_rna002_v0_4_2`.",
+    default="WDX12_rna002_v0_4_3",
+    help="Name of the model to use for classification. Default is `WDX12_rna002_v0_4_3`.",
 )
 
 
