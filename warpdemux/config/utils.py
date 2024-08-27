@@ -29,7 +29,7 @@ def get_model_spc_config(model_name: str) -> SigProcConfig:
     with pkg_resources.path(model_files, "config.toml") as config_path:
         model_config = toml.load(config_path)[model_name]
     sqk = model_config["SQK"]  # sequencing kit, RNA002 or RNA004
-    adapted_config_name = chemistry_specific_config_name(
+    adapted_config_name = adapted_chemistry_specific_config_name(
         sqk
     )  # latest version based on submodule hash
     adapted_config_dict = adapted_config_name_to_dict(adapted_config_name)
