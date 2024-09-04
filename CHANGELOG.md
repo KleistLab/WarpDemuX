@@ -16,4 +16,5 @@
 `
 - Config names now include the translocation speed of the chemistry, ie: `rna002_70bps@v0.4.3`.
 - The created output subdirectory path now contains the version of warpdemux used.
+- Now depends on adapted commit `3ec09fa8ba46c96c4223b516641d7cfa7e7010fd`
 - Event segmentation now relies on true peak detection in the t-scores, rather than sort-and-select. The `num_events` highest peaks in the calculated t-statistics, as detected with a minimal distance of `min_obs` are returned as changepoints.
