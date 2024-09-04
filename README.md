@@ -10,7 +10,7 @@ We introduce WarpDemuX, an ultra-fast and highly accurate adapter-barcoding and 
 
 ```{bash}
 # Clone this repository with the adapt submodule
-git clone --recursive https://github.com/wvdtoorn/WarpDemuX.git [path/to/store/WarpDemuX]
+git clone --recursive https://github.com/KleistLab/WarpDemuX.git [path/to/store/WarpDemuX]
 
 # Create a new conda environment using the environment.yml file
 mamba env create -n WDX -f [path/to/store/WarpDemuX]/environment.yml
