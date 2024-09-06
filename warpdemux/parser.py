@@ -52,8 +52,8 @@ parent_parser.add_argument(
 parent_parser.add_argument(
     "--save_dwell_times",
     type=str2bool,
-    default=True,
-    help="Whether to save segment dwell times in the output file. Default is True.",
+    default=False,
+    help="Whether to save segment dwell times in the output file. Default is False.",
 )
 
 
