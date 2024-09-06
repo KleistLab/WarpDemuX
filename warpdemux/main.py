@@ -137,7 +137,22 @@ def main(args=None):
         ), "Classification config is required for classification."
         model = load_model(config.classif.model_name)
 
-        logging.info("Predicting barcodes...")
+        # check for existing predictions in output_dir, skip the corresponding fpts files
+        existing_predictions = {
+            int(f.split("_")[-1].split(".")[0])
+            for f in os.listdir(config.output.output_dir)
+            if f.startswith("barcode_predictions_")
+        }
+        batch_offset = len(existing_predictions) + 1
+        fpts_files = [
+            f
+            for f in fpts_files
+            if int(f.split("_")[-1].split(".")[0]) not in existing_predictions
+        ]
+        remaining_str = "remaining" if batch_offset > 0 else ""
+        logging.info(
+            f"Predicting barcodes for {len(fpts_files)} {remaining_str} fingerprint files..."
+        )
         pbar = tqdm(
             enumerate(fpts_files),
             total=len(fpts_files),
@@ -155,7 +170,7 @@ def main(args=None):
                 model=model,
                 signals=signals,
                 read_ids=read_ids,
-                batch_idx=index,
+                batch_idx=index + batch_offset,
                 output_dir=config.output.output_dir,
                 classif_config=config.classif,
             )

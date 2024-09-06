@@ -8,6 +8,7 @@ Contact: w.vandertoorn@fu-berlin.de
 
 import argparse
 import os
+import shutil
 from typing import Tuple
 import numpy as np
 import pandas as pd
@@ -95,7 +96,9 @@ parent_parser.add_argument(
     ),
 )
 
-parser = argparse.ArgumentParser(description="Process files.", parents=[parent_parser])
+parser = argparse.ArgumentParser(
+    description="WarpDemuX: Adapter barcode classification for nanopore direct RNA sequencing.",
+)
 
 
 subparsers = parser.add_subparsers(title="workflows", dest="command")
@@ -114,6 +117,16 @@ demux_parser = subparsers.add_parser(
     "demux",
     help="Demultiplex raw signal or preprocessed barcode fingerprints.",
     parents=[parent_parser],
+)
+continue_parser = subparsers.add_parser(
+    "continue",
+    help="Continue from a previous (incomplete) run.",
+)
+
+continue_parser.add_argument(
+    "continue_from",
+    type=str,
+    help="Path to a previous WarpDemuX output directory to continue processing from.",
 )
 
 for _parser in [fpts_parser, reseg_parser]:
@@ -202,6 +215,34 @@ demux_parser.add_argument(
 def parse_args() -> Tuple[str, Config]:
     args = parser.parse_args()
 
+    if args.command == "continue":
+        try:
+            # load the parser arguments from the command.json file
+            with open(os.path.join(args.continue_from, "command.json"), "r") as f:
+                command_dict = json.load(f)
+        except FileNotFoundError:
+            parser.error(
+                "No command.json file found in the continue_from directory. "
+                "Please provide a valid continue-from directory."
+            )
+
+        # create a backup of the command.json file
+        shutil.copy(
+            os.path.join(args.continue_from, "command.json"),
+            os.path.join(args.continue_from, "command_previous.json"),
+        )
+
+        run_dir = args.continue_from
+        args.__dict__.update(command_dict)  # update all params, including `command`
+
+    else:
+        args.output = args.output or os.getcwd()
+
+        run_dir = os.path.join(
+            args.output,
+            "warpdemux_" + __version__.replace(".", "_") + "_" + str(uuid.uuid4())[:8],
+        )
+
     if args.command == "fpts" or args.command == "resegment":
         if not args.config and not args.chemistry:
             parser.error("Either --config or --chemistry must be provided.")
@@ -241,19 +282,11 @@ def parse_args() -> Tuple[str, Config]:
         print("Provided path: {}".format(args.input))
         exit(1)
 
-    args.output = args.output or os.getcwd()
-
-    # create run dir
-    run_dir_name = (
-        "warpdemux_" + __version__.replace(".", "_") + "_" + str(uuid.uuid4())[:8]
-    )
-    run_dir = os.path.join(args.output, run_dir_name)
-    os.makedirs(run_dir, exist_ok=True)
-
     input_config = InputConfig(
         files=files,
         read_ids=read_ids,
         preprocessed=preprocessed,
+        continue_from=args.continue_from if "continue_from" in args else "",
     )
 
     if args.command == "fpts" or args.command == "demux":
@@ -274,8 +307,6 @@ def parse_args() -> Tuple[str, Config]:
         task_config = ResegmentTaskConfig(
             detect_result_dict=detected_boundaries_dict,
         )
-    else:
-        raise ValueError(f"Invalid command: {args.command}")
 
     batch_config = BatchConfig(
         num_proc=args.num_proc,
@@ -317,6 +348,8 @@ def parse_args() -> Tuple[str, Config]:
         sig_proc=spc,
         classif=cc,
     )
+
+    os.makedirs(run_dir, exist_ok=True)
 
     # Create command.json file
     command_dict = vars(args)

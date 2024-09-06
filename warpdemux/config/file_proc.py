@@ -26,6 +26,7 @@ class OutputConfig(BaseConfig):
 class InputConfig(BaseConfig):
     files: List[str] = field(default_factory=list)
     read_ids: Union[List[str], np.ndarray] = field(default_factory=list)
+    continue_from: str = ""
 
     preprocessed: bool = False
 
