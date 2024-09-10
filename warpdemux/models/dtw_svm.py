@@ -11,6 +11,7 @@ from typing import Literal, Optional, Tuple, Union, overload
 import numpy as np
 import pandas as pd
 from sklearn import svm
+import logging
 
 from warpdemux.parallel_distances import distance_matrix_to
 
@@ -61,7 +62,9 @@ class DTW_SVM_Model:
     @property
     def num_bcs(self):
         if self.model is None:
-            raise ValueError("Model not trained yet.")
+            msg = "Model not trained yet."
+            logging.error(msg)
+            raise ValueError(msg)
 
         return self.model.classes_.size
 
@@ -109,13 +112,17 @@ class DTW_SVM_Model:
     # TODO: add confidence threshold with 0 class for unclassified reads
     def prob_to_pred(self, y_prob: np.ndarray) -> np.ndarray:
         if self.label_mapper is None:
-            raise ValueError("Label mapper not set.")
+            msg = "Label mapper not set."
+            logging.error(msg)
+            raise ValueError(msg)
 
         return np.array([self.label_mapper[i] for i in y_prob.argmax(axis=1)])
 
     def predictions_to_df(self, y_pred: np.ndarray, y_prob: np.ndarray) -> pd.DataFrame:
         if self.label_mapper is None:
-            raise ValueError("Label mapper not set.")
+            msg = "Label mapper not set."
+            logging.error(msg)
+            raise ValueError(msg)
         return pd.DataFrame(
             {
                 "predicted_barcode": y_pred,  # -1 is the "no barcode (noise)" class
@@ -161,7 +168,9 @@ class DTW_SVM_Model:
         """set nproc to 1 to disable parallelization, nproc=None to use all available cores"""
 
         if not self.is_trained:
-            raise ValueError("Model not trained yet.")
+            msg = "Model not trained yet."
+            logging.error(msg)
+            raise ValueError(msg)
 
         assert self.X_train is not None  # This informs the type checker
         assert self.model is not None  # This informs the type checker

@@ -8,10 +8,17 @@ Contact: w.vandertoorn@fu-berlin.de
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Optional, Tuple
+import logging
 
 import numpy as np
 from dtaidistance import dtw
 from tqdm import tqdm
+
+# Configure the dtaidistance logger
+dtaidistance_logger = logging.getLogger("be.kuleuven.dtai.distance")
+dtaidistance_logger.setLevel(logging.WARNING)  # Or any other level you prefer
+dtaidistance_logger.propagate = False
+dtaidistance_logger.addHandler(logging.NullHandler())
 
 
 def compute_block_distance(
@@ -61,7 +68,9 @@ def distance_matrix_to(
 
     else:
         if block_size is None:
-            raise ValueError("block_size must be specified when using parallel.")
+            msg = "block_size must be specified when using parallel."
+            logging.error(msg)
+            raise ValueError(msg)
 
         return parallel_distance_matrix_to(
             X,

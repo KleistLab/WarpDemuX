@@ -21,6 +21,8 @@ This file is licensed under the Mozilla Public License 2.0 (MPL 2.0).
 """
 
 import numpy as np
+import logging
+
 import pyximport
 
 pyximport.install(setup_args={"include_dirs": np.get_include()})
@@ -41,7 +43,7 @@ def windowed_t_test(
         return t_scores
 
     except Exception as e:
-        print(e)
+        logging.error(e)
         return np.zeros(0, dtype=int)
 
 

@@ -10,12 +10,13 @@ import importlib.resources as pkg_resources
 from typing import Optional, Union, MutableMapping, Any
 
 import toml
+import logging
+
 from adapted.config.base import load_nested_config_from_file, nested_config_from_dict
 from adapted.config.sig_proc import (
     config_name_to_dict as adapted_config_name_to_dict,
     chemistry_specific_config_name as adapted_chemistry_specific_config_name,
 )
-
 
 from warpdemux.models import model_files
 from warpdemux.config import config_files
@@ -69,14 +70,17 @@ def get_chemistry_specific_config(
     load_adapted_config_first: bool = True,
 ) -> SigProcConfig:
     if chemistry.lower() not in ["rna002", "rna004"]:
-        raise ValueError(f"Unknown chemistry: {chemistry}")
+        msg = f"Unknown chemistry: {chemistry}"
+        logging.error(msg)
+        raise ValueError(msg)
     if version is None:
         version = __version__
 
     if load_adapted_config_first and chemistry is None:
-        raise ValueError(
-            "chemistry must be provided if load_adapted_config_first is True"
-        )
+        msg = "chemistry must be provided if load_adapted_config_first is True"
+        logging.error(msg)
+        raise ValueError(msg)
+
     if load_adapted_config_first and chemistry is not None:
         adapted_config_name = adapted_chemistry_specific_config_name(chemistry)
         adapted_config_dict = adapted_config_name_to_dict(adapted_config_name)
@@ -95,9 +99,10 @@ def get_config(
     chemistry: Optional[str] = None,
 ) -> SigProcConfig:
     if load_adapted_config_first and chemistry is None:
-        raise ValueError(
-            "chemistry must be provided if load_adapted_config_first is True"
-        )
+        msg = "chemistry must be provided if load_adapted_config_first is True"
+        logging.error(msg)
+        raise ValueError(msg)
+
     if load_adapted_config_first and chemistry is not None:
         adapted_config_name = adapted_chemistry_specific_config_name(chemistry)
         adapted_config_dict = adapted_config_name_to_dict(adapted_config_name)

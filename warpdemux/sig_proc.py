@@ -8,7 +8,7 @@ Contact: w.vandertoorn@fu-berlin.de
 
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
-
+import logging
 import numpy as np
 from scipy.signal import find_peaks
 
@@ -24,8 +24,6 @@ from warpdemux.segmentation.segmentation import (
     remove_stall_cpts,
     windowed_t_test,
 )
-
-DetectResults = DetectResults
 
 
 @dataclass
@@ -81,7 +79,9 @@ def impute_window_median(
     """
     # check if window size is at least 3
     if window_size < 3:
-        raise ValueError("window_size should be at least 3")
+        msg = "window_size should be at least 3"
+        logging.error(msg)
+        raise ValueError(msg)
 
     half_window = window_size // 2
 
@@ -167,7 +167,9 @@ def mad_normalize(signal: np.ndarray, accept_nan: bool = False) -> np.ndarray:
 
     if np.isnan(signal).any():
         if not accept_nan:
-            raise ValueError("Signal contains NaN values.")
+            msg = "Signal contains NaN values."
+            logging.error(msg)
+            raise ValueError(msg)
         else:
             shift = np.nanmedian(signal)
             scale = np.nanmedian(np.abs(signal - shift))
@@ -186,7 +188,9 @@ def normalize(
         return signal
 
     if np.isnan(signal).any() and not accept_nan:
-        raise ValueError("Signal contains NaN values.")
+        msg = "Signal contains NaN values."
+        logging.error(msg)
+        raise ValueError(msg)
 
     if method == "mean":
         if accept_nan:
@@ -198,7 +202,9 @@ def normalize(
     elif method == "median":
         norm_signal = mad_normalize(signal, accept_nan=accept_nan)
     else:
-        raise ValueError(f"Normalization method {method} not recognized.")
+        msg = f"Normalization method {method} not recognized."
+        logging.error(msg)
+        raise ValueError(msg)
 
     return norm_signal
 

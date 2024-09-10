@@ -16,6 +16,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import logging
 
 from adapted.detect.combined import DetectResults
 from adapted.output import save_detected_boundaries, save_traces
@@ -56,8 +57,8 @@ def resegment_wrapper(
         return proc_res
     except Exception as e:
         # shouldn't happen, errors should be caught earlier and result in empty fpt
-        print(f"Failed on read {read_id}: {e}")
-        traceback.print_exc()
+        logging.error(f"Failed on read {read_id}: {e}")
+        logging.error(traceback.format_exc())
         return ReadResult(read_id=read_id, success=False, fail_reason="unknown")
 
 
@@ -84,8 +85,8 @@ def barcode_fpt_wrapper(
 
     except Exception as e:
         # shouldn't happen, errors should be caught earlier and result in empty fpt
-        print(f"Failed on read {read_id}: {e}")
-        traceback.print_exc()
+        logging.error(f"Failed on read {read_id}: {e}")
+        logging.error(traceback.format_exc())
         return ReadResult(read_id=read_id, success=False, fail_reason="unknown")
 
 
@@ -143,9 +144,13 @@ def predict_batch(
     batch_idx: int,
     output_dir: str,
     classif_config: ClassificationConfig,
+    verbose: bool = False,
 ) -> None:
     pbar = tqdm(
-        total=1, desc=f"Predicting on fpts batch {batch_idx}", position=1, leave=False
+        total=1,
+        desc=f"Predicting on fpts batch {batch_idx}",
+        position=1,
+        leave=False,
     )
     predictions = model.predict(
         signals,
@@ -164,6 +169,10 @@ def predict_batch(
         suffix=f"_{batch_idx}",
     )
     pbar.close()
+    if verbose:
+        logging.info(
+            f"Predict on batch {batch_idx} completed in {pbar.format_dict['elapsed']:.2f}s"
+        )
 
 
 def _save_detect_fpts_batch(
@@ -182,9 +191,9 @@ def _save_detect_fpts_batch(
     elif pass_or_fail == "fail":
         fn = "failed_reads"
     else:
-        raise ValueError(
-            f"Invalid pass_or_fail: {pass_or_fail}. Must be 'pass' or 'fail'."
-        )
+        msg = f"Invalid pass_or_fail: {pass_or_fail}. Must be 'pass' or 'fail'."
+        logging.error(msg)
+        raise ValueError(msg)
 
     if save_boundaries:
         save_detected_boundaries(
@@ -268,7 +277,7 @@ def save_detect_fpts_and_predict_batch(
 def get_save_detect_fpts_and_predict_batch_fn(
     config: Config,
 ) -> Callable:
-    print("Loading model...")
+    logging.info("Loading model...")
 
     assert (
         config.classif is not None

@@ -9,6 +9,7 @@ Contact: w.vandertoorn@fu-berlin.de
 import os
 import sys
 import time
+import logging
 
 import numpy as np
 from adapted.file_proc.file_proc import get_file_read_id_map, process
@@ -24,15 +25,16 @@ from warpdemux.file_proc import (
     resegment_wrapper,
 )
 from warpdemux.parser import parse_args
+from warpdemux.logger import setup_logger
 
 
 def main(args=None):
-    print("Command executed:")
-    print(" ".join(sys.argv))
 
     command, config = parse_args()
+    setup_logger(os.path.join(config.output.output_dir, "warpdemux.log"))
 
-    print("Saving output to:", config.output.output_dir)
+    logging.info(f"Command: {' '.join(sys.argv)}")
+    logging.info(f"Saving output to: {config.output.output_dir}")
 
     print_files = (
         config.input.files[: min(3, len(config.input.files))]
@@ -42,22 +44,22 @@ def main(args=None):
         else config.input.files
     )
     print_files_str = "\n".join(print_files)
-    print(f"Input Filenames:\n{print_files_str}")
-    print(f"Total files: {len(config.input.files)}")
+    logging.info(f"Input filenames:\n{print_files_str}")
+    logging.info(f"Total number of input files: {len(config.input.files)}")
 
     os.makedirs(config.output.output_dir, exist_ok=True)
     fpts_files = config.input.files
     if command == "fpts" or (command == "demux" and not config.input.preprocessed):
         # report config
-        print("SigProcConfig:")
-        config.sig_proc.pretty_print()
+        logging.info("SigProcConfig:")
+        config.sig_proc.pretty_print(file=logging.getLogger().handlers[0].stream)  # type: ignore
 
         # Preprocess input_read_ids into batches
-        print(f"Preprocessing read IDs for {len(config.input.files)} files")
+        logging.info(f"Indexing read IDs...")
         start_time = time.time()
 
         file_read_id_map = get_file_read_id_map(config)
-        print(f"Time taken: {time.time() - start_time:.2f} seconds")
+        logging.info(f"Indexing took: {time.time() - start_time:.2f} seconds")
 
         config.input.files = []  # no longer needed, save space
         config.input.read_ids = []  # no longer needed, save space
@@ -90,21 +92,21 @@ def main(args=None):
             ]
         )
     elif command == "resegment":
-        print("ATTENTION: only using relevant configs for resegmentation. ")
+        logging.info("ATTENTION: only using relevant configs for resegmentation. ")
 
-        print("Resegmentation configs:")
-        print("Normalization:")
-        print(config.sig_proc.sig_norm)
-        print("Extraction:")
-        print(config.sig_proc.sig_extract)
-        print("Segmentation:")
-        print(config.sig_proc.segmentation)
+        logging.info("Resegmentation configs:")
+        logging.info("Normalization:")
+        logging.info(config.sig_proc.sig_norm)
+        logging.info("Extraction:")
+        logging.info(config.sig_proc.sig_extract)
+        logging.info("Segmentation:")
+        logging.info(config.sig_proc.segmentation)
 
-        print(f"Preprocessing read IDs for {len(config.input.files)} files")
+        logging.info(f"Indexing read IDs...")
         start_time = time.time()
 
         file_read_id_map = get_file_read_id_map(config)
-        print(f"Time taken: {time.time() - start_time:.2f} seconds")
+        logging.info(f"Indexing took: {time.time() - start_time:.2f} seconds")
         config.input.files = []  # no longer needed, save space
         config.input.read_ids = []  # no longer needed, save space
 
@@ -129,15 +131,20 @@ def main(args=None):
         )
 
     if command == "demux":
-        print("Loading model...")
+        logging.info("Loading model...")
         assert (
             config.classif is not None
         ), "Classification config is required for classification."
         model = load_model(config.classif.model_name)
 
-        for index, fpts_fpath in tqdm(
-            enumerate(fpts_files), total=len(fpts_files), desc="Predicting barcodes"
-        ):
+        logging.info("Predicting barcodes...")
+        pbar = tqdm(
+            enumerate(fpts_files),
+            total=len(fpts_files),
+            desc="Predicting barcodes",
+            file=sys.stdout,
+        )
+        for index, fpts_fpath in pbar:
             npz = np.load(fpts_fpath, allow_pickle=True)
             signals = npz["signals"][
                 :, -config.sig_proc.segmentation.barcode_num_events :
@@ -152,6 +159,10 @@ def main(args=None):
                 output_dir=config.output.output_dir,
                 classif_config=config.classif,
             )
+        pbar.close()
+        logging.info(f"Predictions completed in {pbar.format_dict['elapsed']:.2f}s")
+
+    logging.info("Done.")
 
 
 if __name__ == "__main__":

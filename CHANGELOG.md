@@ -5,6 +5,7 @@
 
 - Added a `--chemistry` flag to the parser. This can be used to specify the latest default config TOML file.
 - command.json file is now saved in the output folder and contains the command used to run WarpDemuX.
+- Logging: process outputs are now logged to the `warpdemux.log` file and to stdout.
 
 ### Fixed
 
