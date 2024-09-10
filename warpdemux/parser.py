@@ -4,6 +4,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 import uuid
+import json
 
 from adapted.config.base import load_nested_config_from_file
 from adapted.config.file_proc import (
@@ -319,6 +320,12 @@ def parse_args() -> Tuple[str, Config]:
         sig_proc=spc,
         classif=cc,
     )
+
+    # Create command.json file
+    command_dict = vars(args)
+    command_json_path = os.path.join(run_dir, "command.json")
+    with open(command_json_path, "w") as f:
+        json.dump(command_dict, f, indent=2)
 
     print(config.sig_proc.sig_norm)
     print(config.sig_proc.sig_extract)
