@@ -1,3 +1,11 @@
+"""
+WarpDemuX
+
+Copyright (c) 2023 by Wiep K. van der Toorn
+Contact: w.vandertoorn@fu-berlin.de
+
+"""
+
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Optional, Tuple
 
