@@ -2,7 +2,7 @@ import argparse
 import os
 from datetime import datetime
 from typing import Tuple
-from adapted.output import np
+import numpy as np
 
 import pandas as pd
 from adapted.config.base import load_nested_config_from_file
