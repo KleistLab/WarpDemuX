@@ -1,10 +1,10 @@
 import argparse
 import os
-from datetime import datetime
 from typing import Tuple
 import numpy as np
-
 import pandas as pd
+import uuid
+
 from adapted.config.base import load_nested_config_from_file
 from adapted.config.file_proc import (
     BatchConfig,
@@ -245,10 +245,7 @@ def parse_args() -> Tuple[str, Config]:
     # create run dir
     if args.create_subdir:
         run_dir_name = (
-            "warpdemux_"
-            + __version__.replace(".", "_")
-            + "_"
-            + datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            "warpdemux_" + __version__.replace(".", "_") + "_" + str(uuid.uuid4())[:8]
         )
         run_dir = os.path.join(args.output, run_dir_name)
     else:
