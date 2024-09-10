@@ -56,34 +56,34 @@ WarpDemuX only supports the pod5 file format. Please convert your fast5/slow5/bl
 
 ### Available models
 
-- WDX-DPC_rna002_v0_4_0
-- WDX4_rna002_v0_4_0
-- WDX6_rna002_v0_4_0
-- WDX8_rna002_v0_4_0
-- WDX10_rna002_v0_4_0
-- WDX12_rna002_v0_4_2
+- WDX-DPC_rna002_v0_4_3
+- WDX4_rna002_v0_4_3
+- WDX6_rna002_v0_4_3
+- WDX8_rna002_v0_4_3
+- WDX10_rna002_v0_4_3
+- WDX12_rna002_v0_4_3
 
-### WDX-DPC_rna002_v0_4_0
+### WDX-DPC_rna002_v0_4_3
 
 - For 4 samples, using the original DeePlexiCon barcodes.
 
-### WDX4_rna002_v0_4_0
+### WDX4_rna002_v0_4_3
 
 - For 4 samples. Uses barcodes WDX_bc04, WDX_bc05, WDX_bc06, and WDX_bc08.
 
-### WDX4_rna002_v0_4_0
+### WDX4_rna002_v0_4_3
 
 - For 6 samples. Uses barcodes WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, and WDX_bc11.
 
-### WDX8_rna002_v0_4_0
+### WDX8_rna002_v0_4_3
 
 - For 8 samples. Uses barcodes WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc11 and WDX_bc12.
 
-### WDX10_rna002_v0_4_0
+### WDX10_rna002_v0_4_3
 
 - For 10 samples. Uses barcodes WDX_bc01, WDX_bc02, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc10, WDX_bc11, and WDX_bc12.
 
-### WDX12_rna002_v0_4_2
+### WDX12_rna002_v0_4_3
 
 - For 12 samples. Uses all 12 WDX barcodes.
 
