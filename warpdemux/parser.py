@@ -105,7 +105,7 @@ fpts_parser = subparsers.add_parser(
 )
 reseg_parser = subparsers.add_parser(
     "resegment",
-    help="Re-segment raw signal to barcode fingerprints, no adapter end detection or demultiplexing.",
+    help="Re-segment raw signal to barcode fingerprints, no adapter end detection or demultiplexing. WARNING: this workflow is currently suffering from slow read processing, it is probably faster to run the `fpts` workflow (which redoes the adapter end detection) rather than this workflow.",
     parents=[parent_parser],
 )
 demux_parser = subparsers.add_parser(
