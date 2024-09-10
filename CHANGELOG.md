@@ -22,3 +22,7 @@
 - Event segmentation now relies on true peak detection in the t-scores, rather than sort-and-select. The `num_events` highest peaks in the calculated t-statistics, as detected with a minimal distance of `min_obs` are returned as changepoints.
 - `save_dwell_times` in parser is False by default (True before).
 - The output directory is now named after the version of WarpDemuX and a random UUID rather than the current date and time.
+
+### Removed
+
+- The `--create_subdir` argument is removed. The output directory is now always created in the specified output folder.

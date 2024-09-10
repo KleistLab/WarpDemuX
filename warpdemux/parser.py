@@ -95,13 +95,6 @@ parent_parser.add_argument(
     ),
 )
 
-parent_parser.add_argument(
-    "--create_subdir",
-    type=str2bool,
-    default=True,
-    help="Whether to create a subdirectory for the output. Default is True.",
-)
-
 parser = argparse.ArgumentParser(description="Process files.", parents=[parent_parser])
 
 
@@ -248,17 +241,13 @@ def parse_args() -> Tuple[str, Config]:
         print("Provided path: {}".format(args.input))
         exit(1)
 
-    if args.output is None:
-        args.output = os.getcwd()
+    args.output = args.output or os.getcwd()
 
     # create run dir
-    if args.create_subdir:
-        run_dir_name = (
-            "warpdemux_" + __version__.replace(".", "_") + "_" + str(uuid.uuid4())[:8]
-        )
-        run_dir = os.path.join(args.output, run_dir_name)
-    else:
-        run_dir = args.output
+    run_dir_name = (
+        "warpdemux_" + __version__.replace(".", "_") + "_" + str(uuid.uuid4())[:8]
+    )
+    run_dir = os.path.join(args.output, run_dir_name)
     os.makedirs(run_dir, exist_ok=True)
 
     input_config = InputConfig(
