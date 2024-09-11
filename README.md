@@ -13,8 +13,9 @@ We introduce WarpDemuX, an ultra-fast and highly accurate adapter-barcoding and 
 git clone --recursive https://github.com/KleistLab/WarpDemuX.git [path/to/store/WarpDemuX]
 
 # Create a new conda environment using the environment.yml file
+# We advise to use mamba instead of conda for speed
 mamba env create -n WDX -f [path/to/store/WarpDemuX]/environment.yml
-conda activate WDX
+mamba activate WDX
 ```
 
 WarpDemuX depends on ADAPTed, our tool for adapter and poly(A) tail detection. ADAPTed is included as a submodule for now. To make sure WDX can access this module correctly, you need to install WDX in editable mode. This can be done by using pip's '-e' flag:
@@ -35,6 +36,27 @@ pip install .
 
 cd warpdemux/adapted
 pip install .
+```
+
+### Compilation error
+
+The first time you run WarpDemuX, the Cython code is compiled. This is done automatically.
+If you run into an error message saying something like `ImportError: /lib64/libstdc++.so.6: version 'GLIBCXX_3.4.29' not found`, you can try loading the GCC module:
+
+```
+module avail # check available modules
+module load GCC # or any other GCC module you have
+warpdemux demux [...]
+```
+
+If this doesn't work, try installing the requirements via `pip` only, in a new environment:
+
+```
+mamba create -n WDX2 python=3.8
+mamba activate WDX2
+pip install [path/to/store/WarpDemuX]
+pip install [path/to/store/WarpDemuX]/warpdemux/adapted
+warpdemux demux [...]
 ```
 
 ## Usage

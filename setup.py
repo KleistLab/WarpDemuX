@@ -66,10 +66,10 @@ setup(
         "numpy==1.24.4",
         "pandas",
         "joblib",
+        "attrs",
     ],
     extras_require={
         "live-demux": [
-            "attrs",
             "minknow-api==5.7.2",
         ],
     },
