@@ -1,8 +1,9 @@
-"""ReadCaches for the ReadUntilClient
-"""
+"""ReadCaches for the ReadUntilClient"""
+
 from collections import OrderedDict
 from collections.abc import MutableMapping
 from threading import RLock
+
 
 class ReadCache(MutableMapping):
     """A thread-safe dict-like container with a maximum size
@@ -175,7 +176,7 @@ class AccumulatingCache(ReadCache):
         # ``self._keys`` is an lookup dictionary. It is used to track reads
         #   that have been updated.
         self._keys = OrderedDict()
-        self._max_raw_signal = max_raw_signal * 4 # each signal has 4 bytes
+        self._max_raw_signal = max_raw_signal * 4  # each signal has 4 bytes
         super().__init__(*args, **kwargs)
 
     def __delitem__(self, key):
@@ -224,7 +225,9 @@ class AccumulatingCache(ReadCache):
                     if len(self._dict[key].raw_data) < self._max_raw_signal:
                         self._dict[key].raw_data += value.raw_data
                         self._dict[key].chunk_length += value.chunk_length
-                        self._dict[key].chunk_classifications.extend(value.chunk_classifications)
+                        self._dict[key].chunk_classifications.extend(
+                            value.chunk_classifications
+                        )
                     self.replaced += 1
                 else:
                     # New read
@@ -281,11 +284,11 @@ class AccumulatingCache(ReadCache):
             return data
 
 
-class ChannelCache() :
+class ChannelCache:
     def __init__(self, max_signals, channel):
         self.channel = channel
-        self._max_bytes = max_signals * 4 #f32 -> 4 bytes per sample
-        self._raw_data = bytearray(self._max_bytes) 
+        self._max_bytes = max_signals * 4  # f32 -> 4 bytes per sample
+        self._raw_data = bytearray(self._max_bytes)
         self._raw_pointer = 0
         self._total_raw_data = 0
         self._full = False
@@ -295,32 +298,33 @@ class ChannelCache() :
         self.id = ""
         self.start_sample = -1
         self.chunk_start_sample = -1
-    
+
     @property
     def raw_data(self):
-        return self._raw_data[:self._raw_pointer]
-    
+        return self._raw_data[: self._raw_pointer]
+
     @property
     def chunk_length(self):
         return int(self._total_raw_data / 4)
-    
-    
+
     def update(self, read_object):
         new_chunk = read_object.raw_data
         new_chunk_length = len(new_chunk)
 
         # check if it is still the same read
         if self.number == read_object.number:
-            #check that we weren't full last time:
+            # check that we weren't full last time:
             if not self._full:
-                #check if we would be over capacity
+                # check if we would be over capacity
                 updated_pointer = self._raw_pointer + new_chunk_length
                 if updated_pointer > self._max_bytes:
-                    #here we need to trim raw signal when updating
-                    self._raw_data[self._raw_pointer:self._max_bytes] = new_chunk[:self._max_bytes - updated_pointer]
+                    # here we need to trim raw signal when updating
+                    self._raw_data[self._raw_pointer : self._max_bytes] = new_chunk[
+                        : self._max_bytes - updated_pointer
+                    ]
                     self._full = True
                 else:
-                    self._raw_data[self._raw_pointer:updated_pointer] = new_chunk
+                    self._raw_data[self._raw_pointer : updated_pointer] = new_chunk
                     self._raw_pointer = updated_pointer
 
             self._total_raw_data += new_chunk_length
@@ -329,7 +333,7 @@ class ChannelCache() :
             self.chunk_classifications += list(read_object.chunk_classifications)
 
             return 0
-        
+
         # if this is a new read number we clear some values
         else:
             self.id = read_object.id
@@ -338,20 +342,20 @@ class ChannelCache() :
             self.chunk_start_sample = read_object.chunk_start_sample
             self._total_raw_data = new_chunk_length
             self.num_chunks = 1
-            
+
             if new_chunk_length > self._max_bytes:
                 self._full = True
                 self._raw_pointer = self._max_bytes
-                self._raw_data[:self._raw_pointer] = new_chunk[:self._max_bytes]
+                self._raw_data[: self._raw_pointer] = new_chunk[: self._max_bytes]
             else:
                 self._full = False
                 self._raw_pointer = new_chunk_length
-                self._raw_data[:self._raw_pointer] = new_chunk
-            
+                self._raw_data[: self._raw_pointer] = new_chunk
+
             self.chunk_classifications = list(read_object.chunk_classifications)
 
             return 1
-    
+
     def clear(self):
         self._raw_pointer = 0
         self._total_raw_data = 0
@@ -360,14 +364,15 @@ class ChannelCache() :
         self.number = -1
         self.chunk_classifications = []
 
+
 class PreallocAccumulatingCache(ReadCache):
     """A thread-safe dict-like container with a maximum size and
-    fixed max data stored per channel. Memory stays allocated 
-    between reads, which may reduce computational requirements. 
-    Each channel has a ChannelCache object that gets updated when 
-    a new chunk arrives. 
+    fixed max data stored per channel. Memory stays allocated
+    between reads, which may reduce computational requirements.
+    Each channel has a ChannelCache object that gets updated when
+    a new chunk arrives.
 
-    Implemented with help from the AccumulatingCache above. 
+    Implemented with help from the AccumulatingCache above.
 
     .. warning::
         For compatibility with the ReadUntilClient, the attributes
@@ -386,11 +391,11 @@ class PreallocAccumulatingCache(ReadCache):
         self._channel_start = channel_start
         self._num_channels = channel_end - channel_start + 1
 
-        super().__init__(size = self._num_channels, *args, **kwargs)
+        super().__init__(size=self._num_channels, *args, **kwargs)
 
         for channel in range(channel_start, channel_end + 1):
             self._dict[channel] = ChannelCache(self._max_signals, channel)
-    
+
     def __delitem__(self, channel):
         """Delegate with lock."""
         with self.lock:
@@ -467,9 +472,14 @@ class PreallocAccumulatingCache(ReadCache):
             data = []
             if items >= len(self._updated_channels):
                 if last:
-                    data = [(ch, self._dict[ch]) for ch in reversed(self._updated_channels.keys())]
+                    data = [
+                        (ch, self._dict[ch])
+                        for ch in reversed(self._updated_channels.keys())
+                    ]
                 else:
-                    data = [(ch, self._dict[ch]) for ch in self._updated_channels.keys()]
+                    data = [
+                        (ch, self._dict[ch]) for ch in self._updated_channels.keys()
+                    ]
                 self._updated_channels.clear()
                 return data
 

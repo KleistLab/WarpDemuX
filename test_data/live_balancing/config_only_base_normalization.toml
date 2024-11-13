@@ -1,0 +1,30 @@
+# See README for instructions on possible configurations
+
+[model]
+model_name = "WDX12_rna002_v0_4_4"
+
+[flowcell]
+flowcell_type = "flongle"
+
+
+[[balancers]]
+balance_threshold = 0.05
+min_stat = 50
+balance_type = "base_normalization"
+pod5_watch_dir = "warpdemux/../test_data/live_balancing"
+pod5_check_interval = 0.5
+
+[processing]
+nproc_segmentation = 2
+nproc_classification = 4
+
+[acquisition]
+max_missed_start_offset = 400
+max_chunk_size = 12000
+
+[balancing]
+pred_conf_threshold = 0.2
+
+[reporting]
+save_every_sec = 5
+save_path = "results"

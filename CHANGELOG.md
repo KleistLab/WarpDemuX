@@ -1,3 +1,41 @@
+## [v0.4.4] - 2024-11-13
+
+### Changed
+
+- WarpDemuX now depends on ADAPTed v0.2.3. This includes a new detection workflow that uses a CNN to predict the boundaries of the adapter and polyA signals. The CNN method replaces the previous llr workflow as the primary detection method and provides faster detection. The CNN workflow comes with a depency on torch.
+- Barcode fingerprints are not saved by default. Use `--save_fpts` to save them.
+- Boundaries are not saved by default. Use `--save_boundaries` to save them. In `continue` mode for previous runs in which `save_boundaries` was `False`, previously failed reads will be reanalysed together with the remaining reads. This means that the percentage of succesfully detected adapters will be artificially deflated.
+- `batch_size` was renamed to `batch_size_output`, it now specifies the number of reads per output file rather than the number of reads per thread.
+- The file processing module has been improved: no itermediate files are created anymore, barcode predictions are streamed directly to output files. Nearly all functions in this module have been rewritten. A seperate thread handles the preloading of the reads into memory (io operations in big batch sizes, enqueuing in minibatches), the queue/worker combinations explicitely takes care to enqueue at most `num_proc` minibatches to limit memory usage.
+- Added short names for several parser arguments: `-i` for `--input`, `-o` for `--output`, `-b` for `--batch_size_output`, `-m` for `--model_name`.
+- `config.batch.bidx_passed/failed` is now `config.batch.batch_idx_pass/fail`.
+- Reads are no longer indexed before running WarpDemuX. This saves time and memory, but means that the progress bar now only shows the number of reads processed rather than the percentage of the total.
+- Results directories now include the model name (WDX4-12)and a random UUID.
+- the `pod5` executable installed with WarpDemuX is used to calculate the total number of reads to process parallel to the demux process. At the start of demultipexing the progress bar does not have a 'total' value. This is updated once the `pod5` process has finished.
+- The parser flag for setting the `num_proc` was changed to `-j`.
+- The file processing module has been rewritten to use a separate thread for each type of worker, and to enqueue minibatches of reads rather than individual reads. This reduces memory usage and allows for more efficient I/O.
+- Signal normalization has been simplified. Outliers (spikes) are now clipped to a MAD-based estimate, rather than locally imputed.
+- Major refactoring of the `file_proc` module.
+
+
+### Removed
+
+- The subcommands `fpts` and `resegment` have been removed. WarpDemuX now only supports demux from pod5 (`demux`) or continuing from an incomplete previous WarpDemuX run (`continue`).
+- Several parser arguments were removed: `minibatch_size`, `DEBUG`.
+- The `SigNormConfig` section of the `SigProcConfig` has been removed. Normalization is handled by ADAPTed.
+
+### Added
+
+- Retry functionality. In addition to continuing from a previous run, WarpDemuX can now retry processing failed reads from a previous run (`warpdemux retry`). For this, a slightly slower adapter/polyA detection workflow is used (see ADAPTed `combined_detect_llr2`). Automatic retrying will be integrated into the main detection workflow in a future release.
+- RNA004 support (WDX4), with barcode-specific target accuracy confidence score filtering (`target_accuracy_thresholds` folder).
+- Test data for live balancing dummy test and demultiplexing has been added in the `test_data` folder.
+- Extensive updates to the documentation.
+
+### Fixed
+
+- WarpDemuX now correctly loads the chemistry-specific config files. Previously, whole sections of the chemistry-specific (ADAPTed) config file were overwritten by the WarpDemuX config file.
+- Errors in live balancing dummy test have been fixed.
+
 
 ## [v0.4.3] - 2024-09-11
 

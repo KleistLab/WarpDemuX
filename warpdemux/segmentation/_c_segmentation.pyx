@@ -21,9 +21,7 @@ This file is licensed under the Mozilla Public License 2.0 (MPL 2.0).
 """
 
 import numpy as np
-
 cimport numpy as np
-
 
 cdef bint boolean_variable = True
 
@@ -38,6 +36,7 @@ ctypedef np.int16_t DTYPE_INT16_t
 
 cdef extern from "math.h":
     double sqrt(double m)
+
 
 def c_new_means(
         np.ndarray[DTYPE_t] norm_signal not None,
@@ -123,7 +122,7 @@ def c_valid_cpts_w_cap_t_test(
 
 
 def c_windowed_t_test(
-        np.ndarray[DTYPE_t] raw_signal, DTYPE_INT_t min_base_obs,
+        np.ndarray[DTYPE_t] raw_signal,
         DTYPE_INT_t running_stat_width):
     cdef DTYPE_INT_t pos, idx
     cdef DTYPE_t pos_diff, m1, m2, var1, var2

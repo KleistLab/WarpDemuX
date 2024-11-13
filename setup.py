@@ -62,6 +62,7 @@ setup(
         "scipy",
         "cython==0.29.36",
         "toml",
+        "torch==2.4.1",
         "tqdm",
         "numpy==1.24.4",
         "pandas",

@@ -6,31 +6,24 @@ Contact: w.vandertoorn@fu-berlin.de
 
 """
 
+import logging
 import os
 import sys
 import time
-import logging
-
-import numpy as np
-from adapted.file_proc.file_proc import get_file_read_id_map, process
-from adapted.io_utils import lexsort_num_suffix
-from tqdm import tqdm
 
 import warpdemux  # sets adapted submodule path for editable install
 from warpdemux.file_proc import (
-    barcode_fpt_wrapper,
-    load_model,
-    predict_batch,
-    save_detect_fpts_batch,
-    resegment_wrapper,
+    handle_previous_results,
+    handle_previous_results_retry,
+    run_demux,
 )
-from warpdemux.parser import parse_args
 from warpdemux.logger import setup_logger
+from warpdemux.parser import parse_args
 
 
 def main(args=None):
 
-    command, config = parse_args()
+    config = parse_args()
     setup_logger(os.path.join(config.output.output_dir, "warpdemux.log"))
 
     logging.info(f"Command: {' '.join(sys.argv)}")
@@ -48,136 +41,55 @@ def main(args=None):
     logging.info(f"Total number of input files: {len(config.input.files)}")
 
     os.makedirs(config.output.output_dir, exist_ok=True)
-    fpts_files = config.input.files
-    if command == "fpts" or (command == "demux" and not config.input.preprocessed):
-        # report config
-        logging.info("SigProcConfig:")
-        config.sig_proc.pretty_print(file=logging.getLogger().handlers[0].stream)  # type: ignore
+    # report config
+
+    read_ids_excl = set()
+    read_ids_incl = set()
+    if config.input.continue_from:
 
         # Preprocess input_read_ids into batches
-        logging.info(f"Indexing read IDs...")
+        logging.info(f"Indexing previous results...")
         start_time = time.time()
 
-        file_read_id_map = get_file_read_id_map(config)
+        read_ids_excl = handle_previous_results(config)
         logging.info(f"Indexing took: {time.time() - start_time:.2f} seconds")
+        logging.info(f"Found {len(read_ids_excl)} previously processed reads.")
 
-        config.input.files = []  # no longer needed, save space
-        config.input.read_ids = []  # no longer needed, save space
-
-        # save spc that were used
-        config.sig_proc.to_toml(os.path.join(config.output.output_dir, "config.toml"))
-
-        # if command == "fpts":  # only preprocess
-        process(
-            file_read_id_map=file_read_id_map,
-            config=config,
-            task_fn=barcode_fpt_wrapper,
-            results_fn=save_detect_fpts_batch,
-        )
-        # NOTE: combining is predict and preprocess messes with mp and is slow. Don't do it.
-        # elif not config.input.preprocessed:  # command == "demux", preprocess and predict
-        #     process(
-        #         file_read_id_map=file_read_id_map,
-        #         config=config,
-        #         task_fn=barcode_fpt_wrapper,
-        #         results_fn=get_save_detect_fpts_and_predict_batch_fn(config),
-        #     )
-
-        # TODO: check if there are already any fpts in output dir, might lead to unexpected results..
-        fpts_files = lexsort_num_suffix(
-            [
-                os.path.join(config.output.output_dir, f)
-                for f in os.listdir(config.output.output_dir)
-                if f.startswith("barcode_fpts_") and f.endswith(".npz")
-            ]
-        )
-    elif command == "resegment":
-        logging.info("ATTENTION: only using relevant configs for resegmentation. ")
-
-        logging.info("Resegmentation configs:")
-        logging.info("Normalization:")
-        logging.info(config.sig_proc.sig_norm)
-        logging.info("Extraction:")
-        logging.info(config.sig_proc.sig_extract)
-        logging.info("Segmentation:")
-        logging.info(config.sig_proc.segmentation)
-
-        logging.info(f"Indexing read IDs...")
+    elif config.input.retry_from:
+        logging.info(f"Indexing previously failed reads...")
         start_time = time.time()
-
-        file_read_id_map = get_file_read_id_map(config)
+        read_ids_incl = handle_previous_results_retry(config)
         logging.info(f"Indexing took: {time.time() - start_time:.2f} seconds")
-        config.input.files = []  # no longer needed, save space
-        config.input.read_ids = []  # no longer needed, save space
+        logging.info(f"Found {len(read_ids_incl)} previously failed reads.")
 
-        # save spc that were used
-        config.sig_proc.to_toml(os.path.join(config.output.output_dir, "config.toml"))
+    files = set(config.input.files)
+    if not config.input.retry_from:
+        read_ids_incl = set(config.input.read_ids)
+    config.input.files = (
+        []
+    )  # clear to prevent long lists being copied around to all processes
+    config.input.read_ids = (
+        []
+    )  # clear to prevent long lists being copied around to all processes
 
-        # add a NOTE.txt file to output dir with the following content:
-        # "This directory contains resegmented signals. The signals are not raw signals, but rather normalized and extracted signals."
-        with open(
-            os.path.join(config.output.output_dir, "RESEGMENTATION_NOTE.txt"), "w"
-        ) as f:
-            f.write(
-                "This directory contains resegmented signals. "
-                "Detection parameters in the config.toml may not reflect the ones used during detection."
-            )
+    logging.info(f"Config.output: {config.output.dict() }")
+    logging.info(f"Config.batch: {config.batch.dict() }")
+    logging.info(f"Config.classif: {config.classif.dict() }")
 
-        process(
-            file_read_id_map=file_read_id_map,
-            config=config,
-            task_fn=resegment_wrapper,
-            results_fn=save_detect_fpts_batch,
-        )
+    # save spc that were used
+    config.sig_proc.to_toml(os.path.join(config.output.output_dir, "config.toml"))
 
-    if command == "demux":
-        logging.info("Loading model...")
-        assert (
-            config.classif is not None
-        ), "Classification config is required for classification."
-        model = load_model(config.classif.model_name)
+    logging.info("Starting demultiplexing...")
+    start_time = time.time()
+    run_demux(files, read_ids_incl, read_ids_excl, config)
+    end_time = time.time()
 
-        # check for existing predictions in output_dir, skip the corresponding fpts files
-        existing_predictions = {
-            int(f.split("_")[-1].split(".")[0])
-            for f in os.listdir(config.output.output_dir)
-            if f.startswith("barcode_predictions_")
-        }
-        batch_offset = len(existing_predictions) + 1
-        fpts_files = [
-            f
-            for f in fpts_files
-            if int(f.split("_")[-1].split(".")[0]) not in existing_predictions
-        ]
-        remaining_str = "remaining" if batch_offset > 0 else ""
-        logging.info(
-            f"Predicting barcodes for {len(fpts_files)} {remaining_str} fingerprint files..."
-        )
-        pbar = tqdm(
-            enumerate(fpts_files),
-            total=len(fpts_files),
-            desc="Predicting barcodes",
-            file=sys.stdout,
-        )
-        for index, fpts_fpath in pbar:
-            npz = np.load(fpts_fpath, allow_pickle=True)
-            signals = npz["signals"][
-                :, -config.sig_proc.segmentation.barcode_num_events :
-            ]
-            read_ids = npz["read_ids"]
-
-            predict_batch(
-                model=model,
-                signals=signals,
-                read_ids=read_ids,
-                batch_idx=index + batch_offset,
-                output_dir=config.output.output_dir,
-                classif_config=config.classif,
-            )
-        pbar.close()
-        logging.info(f"Predictions completed in {pbar.format_dict['elapsed']:.2f}s")
-
-    logging.info("Done.")
+    elapsed_time = end_time - start_time
+    hours, remainder = divmod(elapsed_time, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    logging.info(
+        f"Demultiplexing took: {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d} (HH:MM:SS)"
+    )
 
 
 if __name__ == "__main__":

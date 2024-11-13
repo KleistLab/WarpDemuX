@@ -7,28 +7,21 @@ Contact: w.vandertoorn@fu-berlin.de
 """
 
 import argparse
+import ast
+import json
 import os
 import shutil
-from typing import Tuple
-import numpy as np
-import pandas as pd
+import sys
 import uuid
-import json
+from typing import List, Optional
 
-from adapted.config.base import load_nested_config_from_file
-from adapted.config.file_proc import (
-    BatchConfig,
-    TaskConfig as DetectTaskConfig,
-)
+import pandas as pd
 from adapted.io_utils import input_to_filelist
-
-from warpdemux.config.utils import get_model_spc_config, get_chemistry_specific_config
 
 from warpdemux.config.classification import ClassificationConfig
 from warpdemux.config.config import Config
-from warpdemux.config.file_proc import InputConfig, OutputConfig, ResegmentTaskConfig
-from warpdemux.config.sig_proc import SigProcConfig
-from warpdemux._version import __version__
+from warpdemux.config.file_proc import BatchConfig, InputConfig, OutputConfig
+from warpdemux.config.utils import get_model_spc_config
 
 
 def str2bool(v):
@@ -48,28 +41,62 @@ parent_parser = argparse.ArgumentParser(
 
 parent_parser.add_argument(
     "--input",
+    "-i",
     type=str,
     nargs="+",
     help=("Input file(s) or directory(s)."),
 )
 parent_parser.add_argument(
     "--output",
+    "-o",
     type=str,
     default=None,
     help="Path to where the run output folder should be created. Default is the current working directory.",
 )
 
 parent_parser.add_argument(
+    "-m",
+    "--model_name",
+    type=str,
+    default="WDX4_rna004_v0_4_4",
+    help="Name of the model to use for classification. Default is `WDX4_rna004_v0_4_4`.",
+)
+
+parent_parser.add_argument(
+    "-e",
+    "--export",
+    type=str,
+    default=None,
+    help=(
+        "Export custom configuration in format 'section.param=value1,section.param=value2'. "
+        "Example: 'cnn_boundaries.fallback_to_llr_short_reads=true,cnn_boundaries.polya_cand_k=15'. Default is None."
+    ),
+)
+
+parent_parser.add_argument(
+    "--save_fpts",
+    type=str2bool,
+    default=False,
+    help="Whether to save the barcode fingerprints as .npz files. Default is False.",
+)
+
+parent_parser.add_argument(
     "--save_dwell_times",
     type=str2bool,
     default=False,
-    help="Whether to save segment dwell times in the output file. Default is False.",
+    help="Whether to save the dwell times per segment along with the fingerprints. Ignored if --save_fpts is False. Default is False.",
 )
 
+parent_parser.add_argument(
+    "--save_boundaries",
+    type=str2bool,
+    default=False,
+    help="Whether to save the boundaries as .csv files. Default is False.",
+)
 
 parent_parser.add_argument(
-    "-p",
-    "--num_proc",
+    "-j",
+    "--ncores",
     type=int,
     default=None,
     help=(
@@ -79,23 +106,40 @@ parent_parser.add_argument(
 )
 
 parent_parser.add_argument(
-    "--batch_size",
+    "-b",
+    "--batch_size_output",
     type=int,
     default=4000,
-    help=("Number of reads per output file."),
+    help=("Number of reads per output file. Default is 4000."),
 )
 
 parent_parser.add_argument(
+    "-s",
     "--minibatch_size",
     type=int,
-    default=50,
+    default=1000,
+    help=("Number of reads per minibatch. Default is 1000."),
+)
+
+parent_parser.add_argument(
+    "--read_id_csv",
+    type=str,
+    default=None,
     help=(
-        "Number of reads per worker. These reads are loaded into memory prior to"
-        " processing. Choose depending on the max_obs_adapter value and the amount"
-        " of memory available."
+        "Path to a csv file containing read IDs to be processed. Should contain a"
+        " 'read_id' column."
     ),
 )
 
+parent_parser.add_argument(
+    "--read_id_csv_colname",
+    type=str,
+    default="read_id",
+    help=(
+        "Column name in 'read_id_csv' containing the read IDs to be processed. Defaults"
+        " to 'read_id'. This argument is ignored if '--preprocessed' is set."
+    ),
+)
 parser = argparse.ArgumentParser(
     description="WarpDemuX: Adapter barcode classification for nanopore direct RNA sequencing.",
 )
@@ -103,16 +147,6 @@ parser = argparse.ArgumentParser(
 
 subparsers = parser.add_subparsers(title="workflows", dest="command")
 
-fpts_parser = subparsers.add_parser(
-    "fpts",
-    help="Generate barcode fingerprints from raw signal, no demultiplexing.",
-    parents=[parent_parser],
-)
-reseg_parser = subparsers.add_parser(
-    "resegment",
-    help="Re-segment raw signal to barcode fingerprints, no adapter end detection or demultiplexing. WARNING: this workflow is currently suffering from slow read processing, it is probably faster to run the `fpts` workflow (which redoes the adapter end detection) rather than this workflow.",
-    parents=[parent_parser],
-)
 demux_parser = subparsers.add_parser(
     "demux",
     help="Demultiplex raw signal or preprocessed barcode fingerprints.",
@@ -129,91 +163,61 @@ continue_parser.add_argument(
     help="Path to a previous WarpDemuX output directory to continue processing from.",
 )
 
-for _parser in [fpts_parser, reseg_parser]:
-    _parser.add_argument(
-        "--config",
-        type=str,
-        help="Path to a valid configuration toml to use. See warpdemux/config/config_files/ for options.",
-    )
 
-    _parser.add_argument(
-        "--chemistry",
-        type=str,
-        choices=["RNA002", "RNA004"],
-        help="Specify the chemistry to use. If provided, --config is not required and will be ignored if both are provided.",
-    )
+parser_retry = subparsers.add_parser(
+    "retry",
+    help="Retry processing failed reads.",
+)
 
-for _parser in [fpts_parser, demux_parser]:
-    _parser.add_argument(
-        "--read_id_csv",
-        type=str,
-        default=None,
-        help=(
-            "Path to a csv file containing read IDs to be processed. Should contain a"
-            " 'read_id' column."
-        ),
-    )
-
-    _parser.add_argument(
-        "--read_id_csv_colname",
-        type=str,
-        default="read_id",
-        help=(
-            "Column name in 'read_id_csv' containing the read IDs to be processed. Defaults"
-            " to 'read_id'. This argument is ignored if '--preprocessed' is set."
-        ),
-    )
-    _parser.add_argument(
-        "--DEBUG",
-        action="store_true",
-        help="Save ADAPTed traces for adapter detection debug.",
-    )
-
-
-reseg_parser.add_argument(
-    "--prev_results",
+parser_retry.add_argument(
+    "retry_from",
     type=str,
-    nargs="+",
-    required=True,
-    help=(
-        "Directory or path(s) to csv file(s) with previous detection results to be processed. "
-        "This should be the 'detected_boundaries_[batch_id].csv' files from a previous run. "
-    ),
+    help="Path to a folder containing the results of a previous run.",
 )
 
 
-demux_parser.add_argument(
-    "--preprocessed",
-    action="store_true",
-    help=(
-        "If specified, the input files are assumed to be preprocessed and the"
-        " preprocessing step is skipped. Input files should be `barcode_fpts.npz`"
-        " files obtained through `read_data_handler.process_files`."
-    ),
-)
+def parse_export_string(export_str):
+    if export_str is None:
+        return None
 
-demux_parser.add_argument(
-    "--model_name",
-    type=str,
-    default="WDX12_rna002_v0_4_3",
-    help="Name of the model to use for classification. Default is `WDX12_rna002_v0_4_3`.",
-)
+    export_vals = {}
+    try:
+        for pair in export_str.split(","):
+            if "=" not in pair:
+                raise ValueError(f"Missing '=' in parameter pair: {pair}")
+
+            key, value = pair.split("=", maxsplit=1)
+            key = key.strip()
+            if "." not in key:
+                raise ValueError(f"Missing '.' in parameter key: {key}")
+
+            section, attr = key.split(".", maxsplit=1)
+            if not section or not attr:
+                raise ValueError(f"Empty variable or attribute in key: {key}")
+
+            # interpret value as bool, float or int if possible
+            try:
+                # Handle boolean strings case-insensitively
+                if value.strip().lower() in ("true", "false"):
+                    value = value.strip().lower() == "true"
+                else:
+                    value = ast.literal_eval(value)
+            except (ValueError, SyntaxError):
+                value = value.strip()
+
+            export_vals[(section.strip(), attr.strip())] = value
+        return export_vals
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(
+            f"Invalid export string format: {str(e)}. "
+            "Must be in format 'section.attr=value1,section.attr2=value2'"
+        )
 
 
-demux_parser.add_argument(
-    "--classif_block_size",
-    type=int,
-    default=500,
-    help=(
-        "Block size for pairwise distance matrix calculations during classification. "
-        "Affects classification speed. Ideal settings depend on data size and available memory. "
-        "Default is 500."
-    ),
-)
+def parse_args(in_args: Optional[List[str]] = None) -> Config:
 
-
-def parse_args() -> Tuple[str, Config]:
-    args = parser.parse_args()
+    args = in_args or sys.argv[1:]
+    args = parser.parse_args(args)
 
     if args.command == "continue":
         try:
@@ -232,46 +236,63 @@ def parse_args() -> Tuple[str, Config]:
             os.path.join(args.continue_from, "command_previous.json"),
         )
 
+        if "retry_from" in command_dict:
+            del command_dict["retry_from"]
+
         run_dir = args.continue_from
         args.__dict__.update(command_dict)  # update all params, including `command`
+    elif args.command == "retry":
+        try:
+            # load the parser arguments from the command.json file
+            with open(os.path.join(args.retry_from, "command.json"), "r") as f:
+                command_dict = json.load(f)
+        except FileNotFoundError:
+            parser.error(
+                "No command.json file found in the retry_from directory. "
+                "Please provide a valid continue-from directory."
+            )
 
+        # os.makedirs(os.path.join(args.retry_from, "prev_failed"), exist_ok=False)
+        # failed_files = [
+        #     f for f in os.listdir(args.retry_from) if f.startswith("failed_reads")
+        # ]
+        # for f in failed_files:
+        #     shutil.move(
+        #         os.path.join(args.retry_from, f),
+        #         os.path.join(args.retry_from, "prev_failed"),
+        #     )
+
+        # create a backup of the command.json file
+        shutil.copy(
+            os.path.join(args.retry_from, "command.json"),
+            os.path.join(args.retry_from, "command_previous.json"),
+        )
+
+        # if continue_from is set from a previous run, remove it from args
+        if "continue_from" in command_dict:
+            del command_dict["continue_from"]
+
+        run_dir = args.retry_from
+        args.__dict__.update(command_dict)  # update all params, including `command`
+
+        run_dir = args.retry_from
     else:
         args.output = args.output or os.getcwd()
 
         run_dir = os.path.join(
             args.output,
-            "warpdemux_" + __version__.replace(".", "_") + "_" + str(uuid.uuid4())[:8],
+            "warpdemux_" + args.model_name + "_" + str(uuid.uuid4())[:8],
         )
-
-    if args.command == "fpts" or args.command == "resegment":
-        if not args.config and not args.chemistry:
-            parser.error("Either --config or --chemistry must be provided.")
 
     read_ids = []
-    prev_results = []
-    if args.command == "resegment":
-        endswiths = [".csv"]
-        basenameprefix = str("detected_boundaries")
-        prev_results = input_to_filelist(
-            args.prev_results, endswiths=endswiths, basenameprefix=basenameprefix
-        )
-        read_ids = np.hstack(
-            [np.asarray(pd.read_csv(f).read_id) for f in prev_results]
-        ).tolist()
 
-    elif args.read_id_csv is not None:
+    if args.read_id_csv is not None:
         read_ids = pd.read_csv(
             args.read_id_csv,
         )[args.read_id_csv_colname].values
 
-    preprocessed = False
-    if args.command == "demux" and args.preprocessed:
-        preprocessed = True
-        endswiths = [".npz"]
-        basenameprefix = str("barcode_fpts")
-    else:
-        endswiths = [".pod5"]
-        basenameprefix = ""
+    endswiths = [".pod5"]
+    basenameprefix = ""
 
     files = input_to_filelist(
         args.input, endswiths=endswiths, basenameprefix=basenameprefix
@@ -285,64 +306,48 @@ def parse_args() -> Tuple[str, Config]:
     input_config = InputConfig(
         files=files,
         read_ids=read_ids,
-        preprocessed=preprocessed,
         continue_from=args.continue_from if "continue_from" in args else "",
+        retry_from=args.retry_from if "retry_from" in args else "",
     )
 
-    if args.command == "fpts" or args.command == "demux":
-        debug_flag = args.DEBUG
-        task_config = DetectTaskConfig(
-            llr_return_trace=debug_flag,
-        )
-    elif args.command == "resegment":
-        debug_flag = False
-        detected_boundaries_dict = {
-            str(k): v
-            for prev_res in prev_results
-            for k, v in pd.read_csv(prev_res)
-            .set_index("read_id")
-            .to_dict(orient="index")
-            .items()
-        }  # double loop to make type checker happy
-        task_config = ResegmentTaskConfig(
-            detect_result_dict=detected_boundaries_dict,
-        )
+    num_proc = (args.ncores or os.cpu_count()) or -1
 
     batch_config = BatchConfig(
-        num_proc=args.num_proc,
-        batch_size=args.batch_size,
+        num_proc=num_proc,
+        batch_size_output=args.batch_size_output,
         minibatch_size=args.minibatch_size,
     )
 
     output_config = OutputConfig(
         output_dir=run_dir,
-        save_llr_trace=args.command != "resegment" and args.DEBUG,
         save_dwell_time=args.save_dwell_times,
-        save_boundaries=args.command != "resegment",
+        save_fpts=args.save_fpts,
+        save_boundaries=args.save_boundaries,
+        output_subdir_fail=(
+            "failed_reads_retry" if "retry_from" in args else "failed_reads"
+        ),
     )
 
-    if args.command == "demux":
-        spc = get_model_spc_config(args.model_name)
-        cc = ClassificationConfig(
-            model_name=args.model_name,
-            block_size=args.classif_block_size,
-            num_proc=args.num_proc,
-        )
-    else:
-        if args.config:
-            # TODO: document that the provided config file should also include the adapted config sections!
-            spc = load_nested_config_from_file(args.config, SigProcConfig)
-        else:
-            spc = get_chemistry_specific_config(
-                args.chemistry, load_adapted_config_first=True
-            )
-        cc = None
+    spc = get_model_spc_config(args.model_name)
 
+    if args.export is not None:
+        update_dict = parse_export_string(args.export)
+        assert update_dict is not None
+        for (section, attr), value in update_dict.items():
+            section_dict = getattr(
+                spc, section
+            ).copy()  # Create a copy of the section dictionary
+            section_dict[attr] = value  # Update the value
+            setattr(spc, section, section_dict)  # Set the updated dictionary
+
+    spc.update_primary_method()
     spc.update_sig_preload_size()
+    cc = ClassificationConfig(
+        model_name=args.model_name,
+    )
 
     config = Config(
         input=input_config,
-        task=task_config,
         batch=batch_config,
         output=output_config,
         sig_proc=spc,
@@ -357,8 +362,4 @@ def parse_args() -> Tuple[str, Config]:
     with open(command_json_path, "w") as f:
         json.dump(command_dict, f, indent=2)
 
-    print(config.sig_proc.sig_norm)
-    print(config.sig_proc.sig_extract)
-    print(config.sig_proc.segmentation)
-
-    return args.command, config
+    return config

@@ -6,12 +6,12 @@ Contact: w.vandertoorn@fu-berlin.de
 
 """
 
+import logging
 from typing import Literal, Optional, Tuple, Union, overload
 
 import numpy as np
 import pandas as pd
 from sklearn import svm
-import logging
 
 from warpdemux.parallel_distances import distance_matrix_to
 

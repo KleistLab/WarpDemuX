@@ -19,7 +19,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--config_file",
     type=str,
-    default=None,
+    required=True,
+    help="Path to the config file. Absolute path, or relative to the WarpDemuX directory",
 )
 
 
@@ -39,7 +40,14 @@ class DummyClient:
         self,
         max_c: int = 800,
     ):
-        testdir = os.path.join(os.path.dirname(__file__), "test")
+        testdir = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "test_data",
+            "live_balancing",
+        )
+
         self.data = np.load(os.path.join(testdir, "test_signals.npy"))
         self.c = 0
         self.max_c = max_c  # 800
@@ -102,22 +110,9 @@ class DummySession(Session):
         return True
 
 
-def debug_test():
+def debug_test(path_to_config_dir: str):
     config_path = os.path.join(
-        os.path.dirname(__file__),
-        "test",
-        "config_only_read_count.toml",
-    )
-
-    read_until_client = DummyClient(800)
-    session = DummySession(read_until_client, config_path)
-    with ThreadPoolExecutor(1) as executor:
-        future = executor.submit(session.run, batch_size=1)
-    future.result()  # waits for the run to finish
-
-    config_path = os.path.join(
-        os.path.dirname(__file__),
-        "test",
+        path_to_config_dir,
         "config_only_adapter_count.toml",
     )
 
@@ -128,8 +123,18 @@ def debug_test():
     future.result()  # waits for the run to finish
 
     config_path = os.path.join(
-        os.path.dirname(__file__),
-        "test",
+        path_to_config_dir,
+        "config_only_adapter_count.toml",
+    )
+
+    read_until_client = DummyClient(800)
+    session = DummySession(read_until_client, config_path)
+    with ThreadPoolExecutor(1) as executor:
+        future = executor.submit(session.run, batch_size=1)
+    future.result()  # waits for the run to finish
+
+    config_path = os.path.join(
+        path_to_config_dir,
         "config_only_base_normalization.toml",
     )
 
@@ -140,8 +145,7 @@ def debug_test():
     future.result()  # waits for the run to finish
 
     config_path = os.path.join(
-        os.path.dirname(__file__),
-        "test",
+        path_to_config_dir,
         "config_only_none.toml",
     )
 
@@ -152,8 +156,7 @@ def debug_test():
     future.result()  # waits for the run to finish
 
     config_path = os.path.join(
-        os.path.dirname(__file__),
-        "test",
+        path_to_config_dir,
         "config_only_reject_all.toml",
     )
 
@@ -164,8 +167,7 @@ def debug_test():
     future.result()  # waits for the run to finish
 
     config_path = os.path.join(
-        os.path.dirname(__file__),
-        "test",
+        path_to_config_dir,
         "config.toml",
     )
 
@@ -179,12 +181,8 @@ def debug_test():
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    if args.config_file is None:
-        debug_test()
-
-    else:
-        read_until_client = DummyClient(800)
-        session = DummySession(read_until_client, args.config_file)
-        with ThreadPoolExecutor(1) as executor:
-            future = executor.submit(session.run, batch_size=1)
-        future.result()
+    read_until_client = DummyClient(800)
+    session = DummySession(read_until_client, args.config_file)
+    with ThreadPoolExecutor(1) as executor:
+        future = executor.submit(session.run, batch_size=1)
+    future.result()

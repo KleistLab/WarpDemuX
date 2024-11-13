@@ -14,9 +14,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import toml
-
-from adapted.detect.real_range import real_range_check
 from adapted.detect.mvs import mean_var_shift_polyA_detect
+from adapted.detect.real_range import real_range_check
+
+from warpdemux import read_until
 from warpdemux.live_balancing.balancer import BarcodeBalancers
 from warpdemux.live_balancing.config_parser import MainConfig
 from warpdemux.live_balancing.reporting import report_worker
@@ -26,8 +27,6 @@ from warpdemux.live_balancing.worker import (
     classification_worker,
     segmentation_worker,
 )
-
-from warpdemux import read_until
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
@@ -113,6 +112,7 @@ class ChannelRepeatedUnblockDuration:
             elif self.unblock_count[channel] == 3:
                 return self.unblock_duration_3
             else:
+                return self.unblock_duration_3
                 raise RuntimeError(
                     "unblock_count should be no more than 3; check your logic."
                 )

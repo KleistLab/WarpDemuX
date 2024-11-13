@@ -10,14 +10,15 @@ import time
 import traceback
 from multiprocessing import Queue
 
-from warpdemux.read_until import ReadUntilClient
+import numpy as np
 
 from warpdemux.file_proc import load_model
-from warpdemux.models.dtw_svm import confidence_margin
-from warpdemux.sig_proc import extract_adapter, mad_winsor, normalize, segment_signal
 from warpdemux.live_balancing.balancer import BarcodeBalancers
 from warpdemux.live_balancing.config_parser import BalancingConfig, ModelConfig
 from warpdemux.live_balancing.utils import ReadObject, Result
+from warpdemux.models.dtw_svm import confidence_margin
+from warpdemux.read_until import ReadUntilClient
+from warpdemux.sig_proc import extract_adapter, normalize, segment_signal
 
 # TODO make worker functions into classes
 
@@ -42,23 +43,33 @@ def segmentation_worker(
                 extract_padding=config.spc.sig_extract.padding,
             )
             # required
-            norm_adapter_sig = mad_winsor(
+            med = np.median(adapter_sig)
+            mad = np.median(np.abs(adapter_sig - med))
+            np.clip(
                 adapter_sig,
-                outlier_thresh=config.spc.sig_norm.outlier_thresh,
-                window_size=config.spc.sig_norm.winsor_window,
+                med - (mad * config.spc.core.sig_norm_outlier_thresh),
+                med + (mad * config.spc.core.sig_norm_outlier_thresh),
+                out=adapter_sig,
             )
 
             # optional
-            norm_adapter_sig = normalize(
-                norm_adapter_sig,
+            adapter_sig = normalize(
+                adapter_sig,
                 config.spc.sig_extract.normalization,
             )
 
             segment_avgs, _ = segment_signal(
-                norm_adapter_sig,
+                adapter_sig,
                 num_events=config.spc.segmentation.num_events,
-                min_obs_per_base=config.spc.segmentation.min_obs_per_base,
-                running_stat_width=config.spc.segmentation.running_stat_width,
+                min_obs_per_base=min(
+                    config.spc.segmentation.min_obs_per_base,
+                    round(adapter_sig.size / config.spc.segmentation.num_events / 2),
+                ),
+                running_stat_width=min(
+                    config.spc.segmentation.running_stat_width,
+                    round(adapter_sig.size / config.spc.segmentation.num_events),
+                ),
+                accept_less_cpts=config.spc.segmentation.accept_less_cpts,
             )
             segment_avgs = segment_avgs.reshape(1, -1)
 

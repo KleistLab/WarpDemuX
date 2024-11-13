@@ -4,9 +4,20 @@
 [![DOI:10.1101/2024.07.22.604276](http://img.shields.io/badge/DOI-10.1101/2024.07.22.604276-blue.svg)](https://doi.org/10.1101/2024.07.22.604276)
 [![DOI:10.21203/rs.3.rs-4783223/v1](http://img.shields.io/badge/10.21203/rs.3.rs-4783223/v1-blue.svg)](https://doi.org/10.21203/rs.3.rs-4783223/v1)
 
-We introduce WarpDemuX, an ultra-fast and highly accurate adapter-barcoding and demultiplexing approach. WarpDemuX enhances speed and accuracy by fast processing of the raw nanopore signal, the use of a light-weight machine-learning algorithm and the design of optimized barcode sets. Additionally, integrating WarpDemuX into sequencing control software enables real-time enrichment of target molecules through barcode-specific adaptive sampling.
 
-## Installation
+WarpDemuX is an ultra-fast and high-accuracy adapter-barcoding and demultiplexing tool for Nanopore direct RNA sequencing. It enhances speed and accuracy through:
+
+- Fast processing of raw signals
+- Light-weight machine learning algorithms
+- Optimized barcode sets
+- Real-time enrichment capabilities through barcode-specific adaptive sampling
+
+Currently supports both SQK-RNA002 and SQK-RNA004 chemistries.
+
+
+## Quick Start
+
+Installation takes approximately 10 minutes:
 
 ```{bash}
 # Clone this repository with the adapt submodule
@@ -16,19 +27,16 @@ git clone --recursive https://github.com/KleistLab/WarpDemuX.git [path/to/store/
 # We advise to use mamba instead of conda for speed
 mamba env create -n WDX -f [path/to/store/WarpDemuX]/environment.yml
 mamba activate WDX
-```
 
-WarpDemuX depends on ADAPTed, our tool for adapter and poly(A) tail detection. ADAPTed is included as a submodule for now. To make sure WDX can access this module correctly, you need to install WDX in editable mode. This can be done by using pip's '-e' flag:
-
-```
+# install in editable mode
 pip install -e [path/to/store/WarpDemuX]
+pip install -e '.[live-demux]' # For barcode-specific adaptive sampling
 
-# or, for barcode-specific adaptive sampling
-cd [path/to/store/WarpDemuX]
-pip install -e '.[live-demux]'
 ```
 
-Alternatively, if you don't wish to install in editable mode, you can install the warpdemux and adapted packages separately:
+WarpDemuX depends on ADAPTed, our tool for adapter and poly(A) tail detection. ADAPTed is included as a submodule for now. To make sure WDX can access this module correctly, you need to install WDX in editable mode. See above.
+
+If you don't wish to install in editable mode, you can install the warpdemux and adapted packages separately:
 
 ```
 cd [path/to/store/WarpDemuX]
@@ -38,82 +46,276 @@ cd warpdemux/adapted
 pip install .
 ```
 
-### Compilation error
-
-The first time you run WarpDemuX, the Cython code is compiled. This is done automatically.
-If you run into an error message saying something like `ImportError: /lib64/libstdc++.so.6: version 'GLIBCXX_3.4.29' not found`, you can try loading the GCC module:
-
-```
-module avail # check available modules
-module load GCC # or any other GCC module you have
-warpdemux demux [...]
-```
-
-If this doesn't work, try installing the requirements via `pip` only, in a new environment:
-
-```
-mamba create -n WDX2 python=3.8
-mamba activate WDX2
-pip install [path/to/store/WarpDemuX]
-pip install [path/to/store/WarpDemuX]/warpdemux/adapted
-warpdemux demux [...]
-```
-
-## Usage
+## Basic Usage
 
 ```{bash}
 conda activate WDX
-warpdemux demux --input INPUT [INPUT ...] --output OUTPUT --model_name MODEL_NAME
+warpdemux demux -i INPUT [INPUT ...] -o OUTPUT -m MODEL_NAME -j NCORES
 ```
 
-Where INPUT are file(s) or directory(s) to be demultiplexed (pod5 files) and OUTPUT is the path to where the run output folder should be created. MODEL_NAME is the name of the model to use for demultiplexing. See the [Models](#models) section for a list of available models.
+Where:
+- `INPUT`: Pod5 file(s) or directory(s) to demultiplex
+- `OUTPUT`: Path for run output folder
+- `MODEL_NAME`: Model to use (see [Models](#models) section)
+- `NCORES`: Number of cores for parallel processing
+
+Make sure to set `NCORES`, especially when running on a cluster. If not specified, WarpDemuX might incorrectly assume all cores of the node are available to you, which affects the memory allocation and may lead to memory issues.
 
 For further instructions and options, run `warpdemux --help` and `warpdemux demux --help`.
 
-### File formats
+### Advanced Usage Options
+#### Handling Short Reads in RNA004
 
-WarpDemuX only supports the pod5 file format. Please convert your fast5/slow5/blow5 files to pod5 format before running WarpDemuX.
-  
+
+The CNN adapter detection method used for RNA004 has limitations when processing short reads where the adapter signal comprises approximately half of the total signal length. This is due to interference with signal normalization. There are two approaches to handle this:
+
+
+1. **Enable LLR Fallback (During Initial Run, default)**
+   - By default, WarpDemuX enables automatic fallback to the more sensitive LLR method for short reads
+   - Note: This can significantly increase runtime if your data contains many adapter-only reads
+   - You can disable this behavior by setting the `--export cnn_boundaries.fallback_to_llr_short_reads=false` runtime argument
+   
+2. **Process Failed Reads Separately**
+   - Run WarpDemuX with default or disabled LLR fallback settings first
+   - Then use the retry functionality to process failed reads (see below)
+   - This may be preferential when you know upfront that you have many short reads in your data
+
+#### Continuing Interrupted Runs
+Use the `continue` subcommand to resume an interrupted run:
+
+```{bash}
+warpdemux continue /path/to/previous/run/output/WDX[n_barcodes]_[chemistry]_[version]_[UUID]
+```
+
+To modify performance parameters before continuing:
+1. Locate the `command.json` file in the previous run's output folder
+2. Edit performance parameters (e.g., batch size, number of processes)
+3. Important: Do not modify processing parameters as this may cause failures
+
+
+#### Recovering Failed Reads
+
+For RNA004 runs, you can attempt to recover failed reads using a more sensitive detection method:
+
+```{bash}
+warpdemux retry /path/to/previous/run/output/WDX[n_barcodes]_[chemistry]_[version]_[UUID]
+```
+
+Recovered reads are added to the main output folder. Note that retrying also improves yield for non-short reads.
+
+## Barcodes
+
+WarpDemuX uses custom barcode sequences embedded within the RTA (Reverse Transcription Adapter) during library preparation. 
+
+### Available Barcodes
+
+| Barcode ID | Barcode sequence    |
+|------------|-------------------|
+| Barcode 1  | TTTTTACTGCCAGTGACT |
+| Barcode 2  | AGGGGAGAGAGCCCCCCC |
+| Barcode 3  | CACGTCATTTTCCACGTC |
+| Barcode 4  | GGAGGCCAGGCGGACCGA |
+| Barcode 5  | ACGGACCTTTTGACTTAA |
+| Barcode 6  | TATTGCATACTGCGCCGC |
+| Barcode 7  | CCACGGAGGGAGGATTGG |
+| Barcode 8  | TTACCGGCAGTGACGGAC |
+| Barcode 9  | CGAGATTGCATCCCCCCC |
+| Barcode 10 | TACCACCTGCCGGCGGCC |
+| Barcode 11 | GCCCGCCGGGGGAGAAGC |
+| Barcode 12 | TTTTTTTTACCGGCAGTT |
+
+For detailed information about barcode design, optimization, and performance characteristics, please refer to our manuscript.
+
+
 ## Models
 
 ### Available models
 
-- WDX-DPC_rna002_v0_4_3
-- WDX4_rna002_v0_4_3
-- WDX6_rna002_v0_4_3
-- WDX8_rna002_v0_4_3
-- WDX10_rna002_v0_4_3
-- WDX12_rna002_v0_4_3
 
-### WDX-DPC_rna002_v0_4_3
+WarpDemuX RNA004 models are optimized for reads with poly(A) tails. For datasets with many short poly(A) tails, you have two options:
 
-- For 4 samples, using the original DeePlexiCon barcodes.
+1. Enable LLR fallback with `--export cnn_boundaries.fallback_to_llr_short_reads=true`
+2. Switch to LLR detection entirely (slower but better handles short poly(A) tails)
 
-### WDX4_rna002_v0_4_3
+Note: CNN detection is only available for RNA004, while LLR detection is the standard method for RNA002.
 
-- For 4 samples. Uses barcodes WDX_bc04, WDX_bc05, WDX_bc06, and WDX_bc08.
+| Model Name | Chemistry | Samples | Barcodes Used |
+|------------|-----------|----------|---------------|
+| WDX-DPC_rna002_v0_4_4 | RNA002 | 4 | Original DeePlexiCon barcodes |
+| WDX4_rna002_v0_4_4 | RNA002 | 4 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc08 |
+| WDX6_rna002_v0_4_4 | RNA002 | 6 | WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc11 |
+| WDX8_rna002_v0_4_4 | RNA002 | 8 | WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc11, WDX_bc12 |
+| WDX10_rna002_v0_4_4 | RNA002 | 10 | WDX_bc01, WDX_bc02, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc10, WDX_bc11, WDX_bc12 |
+| WDX12_rna002_v0_4_4 | RNA002 | 12 | All 12 WDX barcodes |
+| WDX4_rna004_v0_4_4 | RNA004 | 4 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc07 |
 
-### WDX4_rna002_v0_4_3
+**Coming soon:**
+- RNA004 tRNA models
+- RNA004 non-polyA models
+- RNA004 larger barcode sets
 
-- For 6 samples. Uses barcodes WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, and WDX_bc11.
+## Target Accuracy Modes
 
-### WDX8_rna002_v0_4_3
 
-- For 8 samples. Uses barcodes WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc11 and WDX_bc12.
+WarpDemuX features a flexible accuracy control system that lets you optimize the balance between prediction accuracy and data yield. Each model includes barcode-specific calibrated thresholds that account for unique characteristics and error patterns.
 
-### WDX10_rna002_v0_4_3
+### Available Target Accuracies
 
-- For 10 samples. Uses barcodes WDX_bc01, WDX_bc02, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc10, WDX_bc11, and WDX_bc12.
+- 95.0%
+- 97.5%
+- 99.0%
+- 99.5%
+- 99.9%
 
-### WDX12_rna002_v0_4_3
+### How It Works
 
-- For 12 samples. Uses all 12 WDX barcodes.
+The confidence thresholds are determined through a barcode-specific calibration procedure:
 
-## Tips
 
-If the length of the polyA tail is important to you, keep in mind that you need to preload a sufficient amount of the signal into memory. This will slow down the adapter detection code. Alternatively, you can re-analyse reads for which `polya_truncated` is True with higher `max_obs_adapter` settings.
+1. Baseline error rates are established for each barcode using calibration datasets
+2. Model- and barcode-specific confidence thresholds are computed for each target accuracy level
+3. Predictions are filtered using these thresholds to maintain accuracy targets
 
-## Live balancing
+### Using Target Accuracy Modes
+
+Currently, you can apply target accuracy filtering post-prediction:
+
+1. Group results by predicted barcode
+2. Apply the desired confidence threshold from `target_accuracy_thresholds/*.csv`
+3. Filter predictions that meet or exceed the threshold
+
+*Note: Direct integration of accuracy modes into the main workflow is planned for a future release.*
+
+### Choosing the Right Target
+
+Consider these factors when selecting a target accuracy:
+
+- **Higher Accuracy (99.0-99.9%)**
+  - Fewer but more reliable assignments
+  - Best for applications requiring high precision
+  - Recommended for critical analyses
+
+- **Lower Accuracy (95.0-97.5%)**
+  - Larger dataset with more assignments
+  - Suitable for exploratory analyses
+  - Better for applications that can tolerate some noise
+
+Choose based on your experimental requirements and the relative importance of precision versus dataset size.
+
+## Performance
+
+### Runtime
+- Scales linearly with number of cores
+- RNA004: ~2-3 minutes per 100,000 reads (8 cores, standard laptop)
+
+### Memory Requirements
+- Recommended: 2GB RAM per core (with default minibatch size of 1000)
+- Example: 16GB RAM for 8 cores
+
+## Expected input and output 
+
+### Input
+WarpDemuX exclusively supports the pod5 file format. You must convert any fast5/slow5/blow5 files to pod5 format before processing.
+
+### Output
+
+
+WarpDemuX creates an output directory named `WDX[n_barcodes]_[chemistry]_[version]_[UUID]` with the following structure:
+
+```
+WDX[n_barcodes]_[chemistry]_[version]_[UUID]/
+├── failed_reads/ # Contains statistics for reads where adapter detection failed
+├── predictions/ # Contains barcode predictions for successful reads
+└── detected_boundaries/ # Optional: Created when --save_boundaries true
+└── fingerprints/ # Optional: Created when --save_fpts true
+```
+
+### Predictions Output
+The `predictions/` directory contains `barcode_predictions_[INDEX].csv` files, with each file containing `batch_size_output` reads (configurable via command line). For each successfully processed read, the following information is recorded:
+
+| Column Name | Description |
+|------------|-------------|
+| read_id | Pod5 file read ID (**Note**: May differ from basecalling BAM file read ID, see [split reads](#split-reads)) |
+| predicted_barcode | Predicted barcode (`-1` indicates noise classification) |
+| confidence_score | Prediction confidence score |
+| p01-p12 | Individual probability scores for each barcode |
+| p-1 | Probability score for noise class |
+
+Note: Available probability columns (p01-p12) vary by model.
+
+
+### Failed Reads Output
+The `failed_reads/` directory contains `failed_reads_[INDEX].csv` files with detailed signal statistics for reads where adapter detection failed. Key metrics include:
+
+**Signal Information:**
+- read_id: Pod5 file read ID
+- signal_len: Total signal length
+- preloaded: Length of analyzed preloaded signal
+
+**Adapter Statistics:**
+- adapter_start/end/len: Position and length
+- adapter_mean/std/med/mad: Signal statistics (pA)
+
+**PolyA Tail Statistics:**
+- polya_start/end/len: Position and length
+- polya_mean/std/med/mad: Signal statistics (pA)
+- polya_candidates: Alternative end positions
+
+**RNA Transcript Statistics:**
+- rna_preloaded_start/len: Position and length (post-polya)
+- rna_preloaded_mean/std/med/mad: Signal statistics (pA)
+
+**Detection Method Results:**
+- llr_*: LLR method detection results
+- cnn_*: CNN method detection results
+- mvs_*: MVS method detection results
+
+**Quality Metrics:**
+- adapter_med_dt/mad_dt: Dwell time statistics. Median/median absolute deviation for the dwell time per translocation event in the adapter.
+- fail_reason: Specific cause of detection failure
+
+### Boundaries
+When `--save_boundaries true` is set, successfully detected boundaries are saved to `detected_boundaries_[INDEX].csv` files in the `detected_boundaries/` directory. These files contain the same columns as failed reads output, except for the `fail_reason` column.
+
+## Basecalling and split reads
+
+With newer versions of Dorado (the basecaller), single reads from the pod5 file may be split into one or more reads during basecalling. See [this issue](https://github.com/nanoporetech/dorado/issues/848) for more details. When this happens:
+
+1. Each child read is assigned a new read ID in the basecalling output
+2. The original pod5 read ID is stored in the `pi:Z` field of the BAM file
+
+### Linking predictions to basecalled reads
+Currently, users need to manually link WarpDemuX predictions with basecalled split read outputs using the `pi:Z` field in the BAM file. We will provide tooling to automatically handle this linking given a BAM file and an output directory soon.
+
+## PolyA tail length estimation
+
+WarpDemuX calculates various signal statistics for each read during adapter detection validation. These statistics include an estimate of the poly(A) tail length. By default, these statistics are not saved, but can be enabled using the `--save_boundaries true` command line option.
+
+### Accuracy considerations
+
+The poly(A) tail length estimation has some important limitations to note:
+
+- The default settings are optimized for demultiplexing speed rather than accurate poly(A) measurement
+- Longer poly(A) tails may be underestimated
+- Results should be considered approximate estimates rather than precise measurements
+
+### Improving accuracy
+
+If accurate poly(A) tail length estimation is important for your analysis, you can adjust the settings:
+
+1. Increase the amount of signal preloaded for analysis by setting a higher `max_obs_trace` value:
+```{bash}
+warpdemux demux [...] --export core.max_obs_trace=XYZ
+```
+2. Always enable boundary saving to capture the measurements:
+```{bash}
+warpdemux demux [...] --save_boundaries true
+```
+Note that increasing `max_obs_trace` will result in slower processing times, so consider the tradeoff between accuracy and speed based on your specific needs.
+
+## Barcode-based adaptive sampling (Live Balancing)
+
+Live balancing has been executed as a proof-of-concept for RNA002. 
 
 ### Adapter classification
 
@@ -250,16 +452,57 @@ This is done to make sure that all channels are assigned to a balancer.
 - Note that for balance type `reject_all`  the blacklist and upper bounds are ignored (ignore list can be used)
 - Note that for balance type `none` the ignore list and upper bounds are ignored (blacklist can be used)
 
-### Testing
+## Testing
+
+WarpDemuX has been tested on Ubuntu 20.04.6 LTS and Ubuntu 22.04.4 LTS, as well as WSL 2 on Windows 11.
+
+### Demux
+
+```{bash}
+warpdemux demux -i [path/to/WarpDemuX]/test_data/demux/4000_rna004.pod5 -j 8
+```
+
+### Live balancing
 
 ```{bash}
 conda activate WDX
-cd [path/to/store/WarpDemuX]
+cd [path/to/WarpDemuX]
 
-python -m warpdemux.live_balancing.dummy
-
-python -m warpdemux.live_balancing.dummy --config_file warpdemux/live_balancing/test/config_only_adapter_count.toml
+python -m warpdemux.live_balancing.dummy --config_file warpdemux/../test_data/live_balancing/config_only_read_count.toml
 ```
+
+## Troubleshooting
+
+
+### Compilation Errors
+
+When you first run WarpDemuX, it automatically compiles the Cython code. If you encounter a compilation error like:
+
+
+Try these solutions in order:
+
+1. **Load GCC Module** (if using a cluster/HPC system):
+   ```bash
+   module avail              # List available modules
+   module load GCC          # Load the GCC module
+   warpdemux demux [...]    # Run WarpDemuX
+   ```
+
+2. **Create Clean Environment** (if module loading doesn't work):
+   ```bash
+   # Create new environment with minimal dependencies
+   mamba create -n WDX2 python=3.8
+   mamba activate WDX2
+   
+   # Install WarpDemuX and ADAPTed via pip
+   pip install [path/to/store/WarpDemuX]
+   pip install [path/to/store/WarpDemuX]/warpdemux/adapted
+   
+   # Run WarpDemuX
+   warpdemux demux [...]
+   ```
+
+If you continue to experience issues, please open a GitHub issue with your system details and the full error message.
 
 ## Licensing Information
 
@@ -291,3 +534,18 @@ Please ensure compliance with each license's terms and conditions.
 ### Patent Information
 
 An international priority patent application was filed jointly by RKI, HZI and FU Berlin on April 26, 2024, at the European Patent Office (EPO) under number PCT/EP2024/061629.
+
+## How to Cite
+
+If WarpDemuX has been helpful for your research, please cite our work:
+
+> Demultiplexing and barcode-specific adaptive sampling for nanopore direct RNA sequencing  
+> van der Toorn W, Bohn P, Liu-Wei W, Olguin-Nava M, Smyth RP, von Kleist M  
+> *bioRxiv* 2024.07.22.604276; doi: [https://doi.org/10.1101/2024.07.22.604276](https://doi.org/10.1101/2024.07.22.604276)
+
+You can also cite our Research Square preprint:
+
+> Demultiplexing and barcode-specific adaptive sampling for nanopore direct RNA sequencing  
+> Max von Kleist, Wiep van der Toorn, Wang Liu-Wei et al.  
+> *Research Square* PREPRINT (Version 1), 02 September 2024  
+> doi: [https://doi.org/10.21203/rs.3.rs-4783223/v1](https://doi.org/10.21203/rs.3.rs-4783223/v1)

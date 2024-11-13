@@ -1,36 +1,42 @@
-[WDX4_rna002_v0_4_3]
+[WDX4_rna002_v0_4_4]
 num_bcs = 4
 SQK = "RNA002"
-WDX_version = "0.4.3"
-spc = "rna002_70bps@v0.4.3"
+WDX_version = "0.4.4"
+spc = "rna002_70bps@v0.4.4"
 
-[WDX6_rna002_v0_4_3]
+[WDX6_rna002_v0_4_4]
 num_bcs = 6
 SQK = "RNA002"
-WDX_version = "0.4.3"
-spc = "rna002_70bps@v0.4.3"
+WDX_version = "0.4.4"
+spc = "rna002_70bps@v0.4.4"
 
-[WDX8_rna002_v0_4_3]
+[WDX8_rna002_v0_4_4]
 num_bcs = 8
 SQK = "RNA002"
-WDX_version = "0.4.3"
-spc = "rna002_70bps@v0.4.3"
+WDX_version = "0.4.4"
+spc = "rna002_70bps@v0.4.4"
 
-[WDX10_rna002_v0_4_3]
+[WDX10_rna002_v0_4_4]
 num_bcs = 10
 SQK = "RNA002"
-WDX_version = "0.4.3"
-spc = "rna002_70bps@v0.4.3"
+WDX_version = "0.4.4"
+spc = "rna002_70bps@v0.4.4"
 
-[WDX12_rna002_v0_4_3]
+[WDX12_rna002_v0_4_4]
 num_bcs = 12
 SQK = "RNA002"
-WDX_version = "0.4.3"
-spc = "rna002_70bps@v0.4.3"
-spc_live = "rna002_70bps@v0.4.3_live"
+WDX_version = "0.4.4"
+spc = "rna002_70bps@v0.4.4"
+spc_live = "rna002_70bps@v0.4.4_live"
 
-[WDX-DPC_rna002_v0_4_3]
+[WDX4_rna004_v0_4_4]
+num_bcs = 4
+SQK = "RNA004"
+WDX_version = "0.4.4"
+spc = "rna004_130bps@v0.4.4"
+
+[WDX-DPC_rna002_v0_4_4]
 num_bcs = 4
 SQK = "RNA002"
-WDX_version = "0.4.3"
-spc = "rna002_70bps@v0.4.3"
+WDX_version = "0.4.4"
+spc = "rna002_70bps@v0.4.4"

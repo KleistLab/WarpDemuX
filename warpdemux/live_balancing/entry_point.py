@@ -10,8 +10,7 @@ import argparse
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from external import read_until
-
+from warpdemux import read_until
 from warpdemux.live_balancing.session import Session
 
 

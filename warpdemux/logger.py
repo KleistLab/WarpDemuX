@@ -6,8 +6,8 @@ Contact: w.vandertoorn@fu-berlin.de
 
 """
 
-import sys
 import logging
+import sys
 
 
 # Set up logging to both file and stdout

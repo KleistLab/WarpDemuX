@@ -6,9 +6,9 @@ Contact: w.vandertoorn@fu-berlin.de
 
 """
 
+import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Optional, Tuple
-import logging
 
 import numpy as np
 from dtaidistance import dtw

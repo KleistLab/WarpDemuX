@@ -13,6 +13,4 @@ from adapted.config.base import BaseConfig
 
 @dataclass
 class ClassificationConfig(BaseConfig):
-    model_name: str = "WDX12"
-    block_size: int = 1000
-    num_proc: int = -1
+    model_name: str = "WDX4_rna004_v0_4_4"
