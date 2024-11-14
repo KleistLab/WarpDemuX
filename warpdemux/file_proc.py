@@ -26,10 +26,10 @@ import numpy as np
 import pandas as pd
 from adapted.detect.cnn import load_cnn_model
 from adapted.detect.combined import combined_detect_cnn, combined_detect_llr2
+from adapted.output import save_detected_boundaries
 from pod5.reader import Reader
 from tqdm import tqdm
 
-from warpdemux.adapted.adapted.output import save_detected_boundaries
 from warpdemux.config.config import Config
 from warpdemux.config.sig_proc import SigProcConfig
 from warpdemux.models import model_files
