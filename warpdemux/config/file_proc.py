@@ -27,6 +27,12 @@ class OutputConfig(BaseConfig):
     output_subdir_fpts: str = "fingerprints"
     output_subdir_boundaries: str = "boundaries"
 
+    # Include derived fields here
+    output_dir_pred: str = field(init=False)
+    output_dir_fail: str = field(init=False)
+    output_dir_fpts: str = field(init=False)
+    output_dir_boundaries: str = field(init=False)
+
     def __post_init__(self):
         self.output_dir_pred = os.path.join(self.output_dir, self.output_subdir_pred)
         self.output_dir_fail = os.path.join(self.output_dir, self.output_subdir_fail)
