@@ -68,6 +68,8 @@ setup(
         "pandas",
         "joblib",
         "attrs",
+        #include "bottleneck"
+        "bottleneck",
     ],
     extras_require={
         "live-demux": [
