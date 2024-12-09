@@ -25,7 +25,11 @@ import joblib
 import numpy as np
 import pandas as pd
 from adapted.detect.cnn import load_cnn_model
-from adapted.detect.combined import combined_detect_cnn, combined_detect_llr2
+from adapted.detect.combined import (
+    combined_detect_cnn,
+    combined_detect_llr2,
+    combined_detect_start_peak,
+)
 from adapted.output import save_detected_boundaries
 from pod5.reader import Reader
 from tqdm import tqdm
@@ -289,13 +293,20 @@ def worker_detect_and_predict_on_preloaded_signals(
             full_signal_lens=full_lengths,
             spc=config.sig_proc,
         )
-    else:
+    elif config.sig_proc.primary_method == "cnn":
         detect_results = combined_detect_cnn(
             batch_of_signals=signals,
             full_signal_lens=full_lengths,
             model=model_detect,
             spc=config.sig_proc,
         )
+    elif config.sig_proc.primary_method == "start_peak":
+        detect_results = combined_detect_start_peak(
+            batch_of_signals=signals,
+            full_signal_lens=full_lengths,
+            spc=config.sig_proc,
+        )
+
     del model_detect
     assert isinstance(detect_results, list)
 
@@ -318,21 +329,24 @@ def worker_detect_and_predict_on_preloaded_signals(
         increment_ridx(ridx_dict, "done_fail", ridx_lock, len(fail))
 
     if success:
-        save_pass_queue.put(success)
+        save_output_pass = config.output.save_boundaries or config.output.save_fpts
+        if save_output_pass:
+            save_pass_queue.put(success)
         increment_ridx(ridx_dict, "done_pass", ridx_lock, len(success))
 
-        read_ids, fpts = zip(*[(res.read_id, res.barcode_fpt) for res in success])
+        if config.task.predict:
+            read_ids, fpts = zip(*[(res.read_id, res.barcode_fpt) for res in success])
 
-        predictions = model_predict.predict(
-            np.vstack(fpts),
-            pbar=False,
-            nproc=1,
-            return_df=True,
-        )
-        predictions = add_read_id_col_to_predictions(predictions, read_ids)
+            predictions = model_predict.predict(
+                np.vstack(fpts),
+                pbar=False,
+                nproc=1,
+                return_df=True,
+            )
+            predictions = add_read_id_col_to_predictions(predictions, read_ids)
 
-        save_predict_queue.put(predictions)
-        increment_ridx(ridx_dict, "done_predict", ridx_lock, len(predictions))
+            save_predict_queue.put(predictions)
+            increment_ridx(ridx_dict, "done_predict", ridx_lock, len(predictions))
 
 
 def _queue_batch_processor_df(
@@ -477,7 +491,11 @@ def save_batch_outputs_pass(
         "pass",
         results=read_results,
         batch_idx=bidx,
-        **config.output.dict(),
+        save_fpts=config.output.save_fpts,
+        save_dwell_time=config.output.save_dwell_time,
+        save_boundaries=config.output.save_boundaries,
+        output_dir_boundaries=config.output.output_dir_boundaries,
+        output_dir_fpts=config.output.output_dir_fpts,
     )
 
 
@@ -608,9 +626,11 @@ def add_read_id_col_to_predictions(
     return predictions[["read_id", *cols]]
 
 
-def worker_progress_report(ridx_dict, ridx_lock):
+def worker_progress_report(ridx_dict, ridx_lock, save_predictions: bool = True):
     total_reads = get_global_var("total_reads")
     total_reads_set = total_reads != -1
+
+    success_str = "predict" if save_predictions else "pass"
 
     # Create progress bars for total, failed, and predicted reads
     pbar_total = tqdm(
@@ -625,15 +645,15 @@ def worker_progress_report(ridx_dict, ridx_lock):
         total=total_reads if total_reads_set else None,
         bar_format="{desc}",  # Custom format without speed
     )
-    pbar_predict = tqdm(
-        desc="Predicted reads",
+    pbar_success = tqdm(
+        desc=f"{success_str.capitalize()}ed reads",
         position=2,
         total=total_reads if total_reads_set else None,
         bar_format="{desc}",  # Custom format without speed
     )
 
     last_fail = 0
-    last_predict = 0
+    last_success = 0
     time_passed = 0
 
     while not _STOP_SIGNAL.is_set():
@@ -642,38 +662,38 @@ def worker_progress_report(ridx_dict, ridx_lock):
                 total_reads = get_global_var("total_reads")
                 total_reads_set = total_reads != -1
                 if total_reads_set:
-                    for pbar in [pbar_total, pbar_fail, pbar_predict]:
+                    for pbar in [pbar_total, pbar_fail, pbar_success]:
                         pbar.total = total_reads
 
             with ridx_lock:
                 n_fail = ridx_dict["done_fail"]
-                n_predict = ridx_dict["done_predict"]
-                n_total = n_fail + n_predict
+                n_success = ridx_dict[f"done_{success_str}"]
+                n_total = n_fail + n_success
 
                 new_fail = n_fail - last_fail
-                new_predict = n_predict - last_predict
-                new_total = new_fail + new_predict
+                new_success = n_success - last_success
+                new_total = new_fail + new_success
 
                 # Update progress bars
                 if new_fail > 0:
                     pbar_fail.update(new_fail)
-                if new_predict > 0:
-                    pbar_predict.update(new_predict)
+                if new_success > 0:
+                    pbar_success.update(new_success)
                 pbar_total.update(new_total)
 
                 # Update descriptions with percentages
                 if n_total > 0:
                     fail_pct = (n_fail / n_total) * 100
-                    predict_pct = (n_predict / n_total) * 100
+                    success_pct = (n_success / n_total) * 100
                     pbar_fail.set_description_str(
                         f"Failed reads      {n_fail:,} | {fail_pct:.1f}%"
                     )
-                    pbar_predict.set_description_str(
-                        f"Predicted reads   {n_predict:,} | {predict_pct:.1f}%"
+                    pbar_success.set_description_str(
+                        f"{success_str.capitalize()}ed reads   {n_success:,} | {success_pct:.1f}%"
                     )
 
                 last_fail = n_fail
-                last_predict = n_predict
+                last_success = n_success
 
             time_passed = 0
         time.sleep(0.1)
@@ -682,28 +702,28 @@ def worker_progress_report(ridx_dict, ridx_lock):
     # Final update
     with ridx_lock:
         n_fail = ridx_dict["done_fail"]
-        n_predict = ridx_dict["done_predict"]
-        n_total = n_fail + n_predict
+        n_success = ridx_dict[f"done_{success_str}"]
+        n_total = n_fail + n_success
 
         # Update progress bars one last time
         pbar_fail.update(n_fail - last_fail)
-        pbar_predict.update(n_predict - last_predict)
-        pbar_total.update((n_fail - last_fail) + (n_predict - last_predict))
+        pbar_success.update(n_success - last_success)
+        pbar_total.update((n_fail - last_fail) + (n_success - last_success))
 
         if n_total > 0:
             fail_pct = (n_fail / n_total) * 100
-            predict_pct = (n_predict / n_total) * 100
+            success_pct = (n_success / n_total) * 100
             pbar_fail.set_description_str(
                 f"Failed reads      {n_fail:,} | {fail_pct:.1f}%"
             )
-            pbar_predict.set_description_str(
-                f"Predicted reads   {n_predict:,} | {predict_pct:.1f}%"
+            pbar_success.set_description_str(
+                f"{success_str.capitalize()}ed reads   {n_success:,} | {success_pct:.1f}%"
             )
 
     # Close all progress bars
     pbar_total.close()
     pbar_fail.close()
-    pbar_predict.close()
+    pbar_success.close()
 
 
 def check_total_num_reads(pod5_files: Set[str]) -> int:
@@ -774,7 +794,10 @@ def run_demux(
     """
 
     save_output_pass = config.output.save_boundaries or config.output.save_fpts
+    save_predictions = config.output.save_predictions
+
     save_pass_thread = None
+    save_predict_thread = None
 
     # set global variables for batch indices for continue mode
     set_global_var("bidx_pass", config.batch.bidx_pass)
@@ -790,15 +813,15 @@ def run_demux(
         ), "Classification configuration not provided"  # make linter happy
         model_predict = load_model(config.classif.model_name)
 
-        if config.input.retry_from:
+        if config.sig_proc.primary_method != "cnn" or config.input.retry_from:
             model_detect = None
         else:
             model_detect = load_cnn_model(config.sig_proc.cnn_boundaries.model_name)
 
         preloaded_minibatch_queue = manager.Queue(maxsize=config.batch.num_proc)
-        save_pass_queue = manager.Queue()
+        save_pass_queue = manager.Queue() if save_output_pass else None
         save_fail_queue = manager.Queue()
-        save_predict_queue = manager.Queue()
+        save_predict_queue = manager.Queue() if save_predictions else None
 
         ridx_lock = manager.Lock()
         bidx_lock = manager.Lock()
@@ -871,18 +894,22 @@ def run_demux(
             ),
         )
         # save predictions
-        save_predict_thread = threading.Thread(
-            target=queue_batch_processor,
-            args=(
-                save_predict_queue,
-                save_batch_predictions,
-                ridx_dict,
-                "saved_predict",
-                ridx_lock,
-                bidx_dict,
-                bidx_lock,
-                config,
-            ),
+        save_predict_thread = (
+            threading.Thread(
+                target=queue_batch_processor,
+                args=(
+                    save_predict_queue,
+                    save_batch_predictions,
+                    ridx_dict,
+                    "saved_predict",
+                    ridx_lock,
+                    bidx_dict,
+                    bidx_lock,
+                    config,
+                ),
+            )
+            if save_predictions
+            else None
         )
 
         progress_bar_thread = threading.Thread(
@@ -890,6 +917,7 @@ def run_demux(
             args=(
                 ridx_dict,
                 ridx_lock,
+                save_predictions,
             ),
         )
 
@@ -900,7 +928,8 @@ def run_demux(
         if save_output_pass and save_pass_thread:
             save_pass_thread.start()
         save_fail_thread.start()
-        save_predict_thread.start()
+        if save_predictions and save_predict_thread:
+            save_predict_thread.start()
         enqueue_minibatches_thread.start()
 
         progress_bar_thread.start()
@@ -982,19 +1011,23 @@ def run_demux(
         logging.debug("All detect and predict workers have finished")
 
         # signal the save threads that no more minibatches will be added to the queues
-        save_pass_queue.put(None)
-        save_fail_queue.put(None)
-        save_predict_queue.put(None)
+        if save_fail_queue:
+            save_fail_queue.put(None)
+        if save_pass_queue:
+            save_pass_queue.put(None)
+        if save_predict_queue:
+            save_predict_queue.put(None)
 
         logging.debug("Signalled save threads to finish")
 
         logging.debug("Waiting for save threads to finish")
 
         total_reads_thread.join()
-        if save_output_pass and save_pass_thread:
-            save_pass_thread.join()
         save_fail_thread.join()
-        save_predict_thread.join()
+        if save_pass_thread:
+            save_pass_thread.join()
+        if save_predict_thread:
+            save_predict_thread.join()
 
         logging.debug("Save threads finished")
 
@@ -1002,9 +1035,10 @@ def run_demux(
         progress_bar_thread.join()
         logging.debug("Progress bar thread finished")
 
-        if ridx_dict["done_predict"] > 0:
+        success_str = "predict" if save_predictions else "pass"
+        if ridx_dict[f"done_{success_str}"] > 0:
             logging.info(
-                f"Adapter was successfully detected in {ridx_dict['done_predict']} / { ridx_dict['done_fail'] + ridx_dict['done_predict']} reads  ({ridx_dict['done_predict'] / ridx_dict['enqueued'] * 100:.2f}%)."
+                f"Adapter was successfully detected in {ridx_dict[f'done_{success_str}']} / { ridx_dict['done_fail'] + ridx_dict[f'done_{success_str}']} reads  ({ridx_dict[f'done_{success_str}'] / ridx_dict['enqueued'] * 100:.2f}%)."
             )
         else:
-            logging.info(f"No predictions were made.")
+            logging.info(f"All reads failed.")

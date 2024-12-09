@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 import numpy as np
+from adapted.container_types import ReadResult as AdaptedReadResult
 from adapted.detect.combined import DetectResults
-from adapted.file_proc.file_proc import ReadResult as AdaptedReadResult
 from scipy.signal import find_peaks
 
 from warpdemux.config.sig_proc import SigProcConfig

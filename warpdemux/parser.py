@@ -8,6 +8,7 @@ Contact: w.vandertoorn@fu-berlin.de
 
 import argparse
 import ast
+import datetime
 import json
 import os
 import shutil
@@ -16,11 +17,17 @@ import uuid
 from typing import List, Optional
 
 import pandas as pd
+import toml
 from adapted.io_utils import input_to_filelist
 
 from warpdemux.config.classification import ClassificationConfig
 from warpdemux.config.config import Config
-from warpdemux.config.file_proc import BatchConfig, InputConfig, OutputConfig
+from warpdemux.config.file_proc import (
+    BatchConfig,
+    InputConfig,
+    OutputConfig,
+    TaskConfig,
+)
 from warpdemux.config.utils import get_model_spc_config
 
 
@@ -69,7 +76,10 @@ parent_parser.add_argument(
     default=None,
     help=(
         "Export custom configuration in format 'section.param=value1,section.param=value2'. "
-        "Example: 'cnn_boundaries.fallback_to_llr_short_reads=true,cnn_boundaries.polya_cand_k=15'. Default is None."
+        "Example: '--export cnn_boundaries.fallback_to_llr_short_reads=true,cnn_boundaries.polya_cand_k=15'. "
+        "Alternatively, you can provide a path to a toml file containing the custom configuration. "
+        "Example: '--export /path/to/config.toml'. "
+        "Only use this argument if you know what you are doing. Default is None."
     ),
 )
 
@@ -137,7 +147,7 @@ parent_parser.add_argument(
     default="read_id",
     help=(
         "Column name in 'read_id_csv' containing the read IDs to be processed. Defaults"
-        " to 'read_id'. This argument is ignored if '--preprocessed' is set."
+        " to 'read_id'."
     ),
 )
 parser = argparse.ArgumentParser(
@@ -152,6 +162,13 @@ demux_parser = subparsers.add_parser(
     help="Demultiplex raw signal or preprocessed barcode fingerprints.",
     parents=[parent_parser],
 )
+
+prep_parser = subparsers.add_parser(
+    "prep",
+    help="Prepare data for WarpDemuX. This ignores most model-specific parameters.",
+    parents=[parent_parser],
+)
+
 continue_parser = subparsers.add_parser(
     "continue",
     help="Continue from a previous (incomplete) run.",
@@ -180,38 +197,48 @@ def parse_export_string(export_str):
     if export_str is None:
         return None
 
-    export_vals = {}
-    try:
-        for pair in export_str.split(","):
-            if "=" not in pair:
-                raise ValueError(f"Missing '=' in parameter pair: {pair}")
+    if os.path.exists(export_str):
+        print(f"Loading custom configuration from {export_str}", file=sys.stderr)
+        toml_data = toml.load(export_str)
+        export_vals = {}
+        for section, params in toml_data.items():
+            for attr, value in params.items():
+                export_vals[(section, attr)] = value
 
-            key, value = pair.split("=", maxsplit=1)
-            key = key.strip()
-            if "." not in key:
-                raise ValueError(f"Missing '.' in parameter key: {key}")
-
-            section, attr = key.split(".", maxsplit=1)
-            if not section or not attr:
-                raise ValueError(f"Empty variable or attribute in key: {key}")
-
-            # interpret value as bool, float or int if possible
-            try:
-                # Handle boolean strings case-insensitively
-                if value.strip().lower() in ("true", "false"):
-                    value = value.strip().lower() == "true"
-                else:
-                    value = ast.literal_eval(value)
-            except (ValueError, SyntaxError):
-                value = value.strip()
-
-            export_vals[(section.strip(), attr.strip())] = value
         return export_vals
-    except ValueError as e:
-        raise argparse.ArgumentTypeError(
-            f"Invalid export string format: {str(e)}. "
-            "Must be in format 'section.attr=value1,section.attr2=value2'"
-        )
+    else:
+        export_vals = {}
+        try:
+            for pair in export_str.split(","):
+                if "=" not in pair:
+                    raise ValueError(f"Missing '=' in parameter pair: {pair}")
+
+                key, value = pair.split("=", maxsplit=1)
+                key = key.strip()
+                if "." not in key:
+                    raise ValueError(f"Missing '.' in parameter key: {key}")
+
+                section, attr = key.split(".", maxsplit=1)
+                if not section or not attr:
+                    raise ValueError(f"Empty variable or attribute in key: {key}")
+
+                # interpret value as bool, float or int if possible
+                try:
+                    # Handle boolean strings case-insensitively
+                    if value.strip().lower() in ("true", "false"):
+                        value = value.strip().lower() == "true"
+                    else:
+                        value = ast.literal_eval(value)
+                except (ValueError, SyntaxError):
+                    value = value.strip()
+
+                export_vals[(section.strip(), attr.strip())] = value
+            return export_vals
+        except ValueError as e:
+            raise argparse.ArgumentTypeError(
+                f"Invalid export string format: {str(e)}. "
+                "Must be in format 'section.attr=value1,section.attr2=value2'"
+            )
 
 
 def parse_args(in_args: Optional[List[str]] = None) -> Config:
@@ -252,16 +279,6 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
                 "Please provide a valid continue-from directory."
             )
 
-        # os.makedirs(os.path.join(args.retry_from, "prev_failed"), exist_ok=False)
-        # failed_files = [
-        #     f for f in os.listdir(args.retry_from) if f.startswith("failed_reads")
-        # ]
-        # for f in failed_files:
-        #     shutil.move(
-        #         os.path.join(args.retry_from, f),
-        #         os.path.join(args.retry_from, "prev_failed"),
-        #     )
-
         # create a backup of the command.json file
         shutil.copy(
             os.path.join(args.retry_from, "command.json"),
@@ -281,7 +298,12 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
 
         run_dir = os.path.join(
             args.output,
-            "warpdemux_" + args.model_name + "_" + str(uuid.uuid4())[:8],
+            "warpdemux_"
+            + args.model_name
+            + "_"
+            + datetime.datetime.now().strftime("%Y%m%d_%H%M")
+            + "_"
+            + str(uuid.uuid4())[:8],
         )
 
     read_ids = []
@@ -318,15 +340,33 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
         minibatch_size=args.minibatch_size,
     )
 
-    output_config = OutputConfig(
-        output_dir=run_dir,
-        save_dwell_time=args.save_dwell_times,
-        save_fpts=args.save_fpts,
-        save_boundaries=args.save_boundaries,
-        output_subdir_fail=(
-            "failed_reads_retry" if "retry_from" in args else "failed_reads"
-        ),
-    )
+    if args.command == "prep":
+        output_config = OutputConfig(
+            output_dir=run_dir,
+            save_dwell_time=args.save_dwell_times,
+            save_fpts=True,
+            save_boundaries=args.save_boundaries,
+            save_predictions=False,
+            output_subdir_fail=(
+                "failed_reads_retry" if "retry_from" in args else "failed_reads"
+            ),
+        )
+        task_config = TaskConfig(
+            predict=False,
+        )
+    else:
+        output_config = OutputConfig(
+            output_dir=run_dir,
+            save_dwell_time=args.save_dwell_times,
+            save_fpts=args.save_fpts,
+            save_boundaries=args.save_boundaries,
+            output_subdir_fail=(
+                "failed_reads_retry" if "retry_from" in args else "failed_reads"
+            ),
+        )
+        task_config = TaskConfig(
+            predict=True,
+        )
 
     spc = get_model_spc_config(args.model_name)
 
@@ -342,6 +382,7 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
 
     spc.update_primary_method()
     spc.update_sig_preload_size()
+
     cc = ClassificationConfig(
         model_name=args.model_name,
     )
@@ -352,6 +393,7 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
         output=output_config,
         sig_proc=spc,
         classif=cc,
+        task=task_config,
     )
 
     os.makedirs(run_dir, exist_ok=True)

@@ -8,7 +8,7 @@ Contact: w.vandertoorn@fu-berlin.de
 
 import importlib.resources as pkg_resources
 import logging
-from typing import Any, MutableMapping, Optional, Union
+from typing import Any, Dict, Optional
 
 import toml
 from adapted.config.base import load_nested_config_from_file, nested_config_from_dict
@@ -23,27 +23,36 @@ from warpdemux.config.sig_proc import SigProcConfig
 from warpdemux.models import model_files
 
 
+def update_nested_dicts(
+    original_dict: Dict[str, Any],
+    update_dict: Dict[str, Any],
+) -> Dict[str, Any]:
+    common_keys = set(original_dict.keys()) & set(update_dict.keys())
+    # config dicts are nested, so we need to update nested dictionaries, rather than just merging the top level
+    for key in common_keys:
+        original_dict[key].update(update_dict[key])
+    keys_only_in_update = set(update_dict.keys()) - set(original_dict.keys())
+    for key in keys_only_in_update:
+        original_dict[key] = update_dict[key]
+    updated_dict = original_dict
+    return updated_dict
+
+
 # TODO: update model naming to WDX[xx]_rna00[x]_xxbps@v[x].[x].[x]
 def get_model_spc_config(model_name: str) -> SigProcConfig:
     with pkg_resources.path(model_files, "config.toml") as config_path:
         model_config = toml.load(config_path)[model_name]
     sqk = model_config["SQK"]  # sequencing kit, RNA002 or RNA004
     adapted_config_name = adapted_chemistry_specific_config_name(sqk)
-    adapted_config_dict = adapted_config_name_to_dict(adapted_config_name)
-    warpdemux_config_dict = config_name_to_dict(model_config["spc"])
-
-    common_keys = set(adapted_config_dict.keys()) & set(warpdemux_config_dict.keys())
-    # config dicts are nested, so we need to update nested dictionaries, rather than just merging the top level
-    for key in common_keys:
-        adapted_config_dict[key].update(
-            warpdemux_config_dict[key]
-        )  # merge the two dictionaries, warpdemux_config_dict overwrites adapted_config_dict
-    keys_only_in_warpdemux = set(warpdemux_config_dict.keys()) - set(
-        adapted_config_dict.keys()
+    adapted_config_dict: Dict[str, Any] = adapted_config_name_to_dict(
+        adapted_config_name
     )
-    for key in keys_only_in_warpdemux:
-        adapted_config_dict[key] = warpdemux_config_dict[key]
-    return nested_config_from_dict(adapted_config_dict, SigProcConfig)
+    warpdemux_config_dict: Dict[str, Any] = config_name_to_dict(model_config["spc"])
+
+    updated_config_dict = update_nested_dicts(
+        adapted_config_dict, warpdemux_config_dict
+    )
+    return nested_config_from_dict(updated_config_dict, SigProcConfig)
 
 
 def get_model_spc_live_config(model_name: str) -> SigProcConfig:
@@ -84,19 +93,17 @@ def get_chemistry_specific_config(
     if version is None:
         version = __version__
 
-    if load_adapted_config_first and chemistry is None:
-        msg = "chemistry must be provided if load_adapted_config_first is True"
-        logging.error(msg)
-        raise ValueError(msg)
-
-    if load_adapted_config_first and chemistry is not None:
+    if load_adapted_config_first:
         adapted_config_name = adapted_chemistry_specific_config_name(chemistry)
         adapted_config_dict = adapted_config_name_to_dict(adapted_config_name)
         warpdemux_config_dict = config_name_to_dict(
             chemistry_specific_config_name(chemistry, version)
         )
-        adapted_config_dict.update(warpdemux_config_dict)
-        return nested_config_from_dict(adapted_config_dict, SigProcConfig)
+
+        updated_config_dict = update_nested_dicts(
+            adapted_config_dict, warpdemux_config_dict
+        )
+        return nested_config_from_dict(updated_config_dict, SigProcConfig)
     else:
         return get_config(chemistry_specific_config_name(chemistry, version))
 
@@ -115,13 +122,16 @@ def get_config(
         adapted_config_name = adapted_chemistry_specific_config_name(chemistry)
         adapted_config_dict = adapted_config_name_to_dict(adapted_config_name)
         warpdemux_config_dict = config_name_to_dict(config_name)
-        adapted_config_dict.update(warpdemux_config_dict)
-        return nested_config_from_dict(adapted_config_dict, SigProcConfig)
+
+        updated_config_dict = update_nested_dicts(
+            adapted_config_dict, warpdemux_config_dict
+        )
+        return nested_config_from_dict(updated_config_dict, SigProcConfig)
     else:
         with pkg_resources.path(config_files, f"{config_name}.toml") as config_path:
             return load_nested_config_from_file(config_path, SigProcConfig)
 
 
-def config_name_to_dict(config_name: str) -> Union[dict, MutableMapping[str, Any]]:
+def config_name_to_dict(config_name: str) -> Dict[str, Any]:
     with pkg_resources.path(config_files, f"{config_name}.toml") as config_path:
         return toml.load(config_path)

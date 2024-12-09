@@ -30,7 +30,10 @@ mamba activate WDX
 
 # install in editable mode
 pip install -e [path/to/store/WarpDemuX]
-pip install -e '.[live-demux]' # For barcode-specific adaptive sampling
+
+# For barcode-specific adaptive sampling
+cd [path/to/store/WarpDemuX]
+pip install -e '.[live-demux]'
 
 ```
 
@@ -64,6 +67,16 @@ Make sure to set `NCORES`, especially when running on a cluster. If not specifie
 For further instructions and options, run `warpdemux --help` and `warpdemux demux --help`.
 
 ### Advanced Usage Options
+#### Fingerprinting
+
+To preprocess your data to obtain the fingerprint for each read, without running barcode prediction, use:
+
+```{bash}
+warpdemux prep -i INPUT [INPUT ...] -o OUTPUT -m MODEL_NAME -j NCORES ...
+```
+
+Use `--export /path/to/valid/config.toml` to specify a custom config file for the preprocessing step, e.g. when you are developing a new model.
+
 #### Handling Short Reads in RNA004
 
 

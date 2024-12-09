@@ -18,6 +18,7 @@ from adapted.config.base import BaseConfig
 class OutputConfig(BaseConfig):
     output_dir: str = ""
 
+    save_predictions: bool = True
     save_dwell_time: bool = False
     save_fpts: bool = False
     save_boundaries: bool = True
@@ -38,9 +39,10 @@ class OutputConfig(BaseConfig):
         # create output directories if valid
         if self.output_dir:
             os.makedirs(self.output_dir, exist_ok=True)
-            os.makedirs(self.output_dir_pred, exist_ok=True)
             os.makedirs(self.output_dir_fail, exist_ok=True)
 
+            if self.save_predictions:
+                os.makedirs(self.output_dir_pred, exist_ok=True)
             if self.save_boundaries:
                 os.makedirs(self.output_dir_boundaries, exist_ok=True)
             if self.save_fpts:
@@ -68,4 +70,4 @@ class BatchConfig(BaseConfig):
 
 @dataclass
 class TaskConfig(BaseConfig):
-    pass
+    predict: bool = True

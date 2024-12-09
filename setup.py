@@ -1,11 +1,10 @@
 import os
+import re
 
 import numpy as np
 from Cython.Build import cythonize
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
-
-import re
 
 VERSIONFILE = "warpdemux/_version.py"
 verstrline = open(VERSIONFILE, "rt").read()
@@ -68,6 +67,7 @@ setup(
         "pandas",
         "joblib",
         "attrs",
+        "bottleneck",
     ],
     extras_require={
         "live-demux": [

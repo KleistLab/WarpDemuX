@@ -21,3 +21,9 @@ cnn_detect = false
 
 [llr_boundaries]
 llr_detect = true
+
+[med_shift]
+detect_med_shift = false
+
+[rna_start_peak]
+detect_rna_start_peak = false

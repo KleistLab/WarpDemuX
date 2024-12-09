@@ -1,3 +1,19 @@
+## [v0.4.5] - 2024-12-09
+
+### Changed
+
+- WarpDemuX now depends on ADAPTed v0.2.4. This includes a new detection workflow that uses the inital peak in the adapter signal as baseline for the RNA start detection.
+- Date and time of the run have been added to the output directory name.
+
+### Added
+
+- `--export` flag to pass particular configuration variables or a full config file.
+- `prep` subcommand to preprocess reads for WarpDemuX, this includes the detection of the boundaries and the fingerprinting of the barcode sequences.
+
+### Fixed
+
+- Missing `bottleneck` dependency for editable WarpDemuX installation.
+
 ## [v0.4.4] - 2024-11-13
 
 ### Changed
