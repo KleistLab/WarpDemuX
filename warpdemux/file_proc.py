@@ -139,9 +139,20 @@ def scan_processed_reads(
                 processed_reads.update(line.split(",")[0] for line in f.readlines()[1:])
 
     if not failed_only:
-        pass_sub = os.path.join(continue_from_path, "predictions")
+        if os.path.isdir(os.path.join(continue_from_path, "predictions")):
+            pass_sub = os.path.join(continue_from_path, "predictions")
+            starts_with = "barcode_predictions_"
+            ends_with = ".csv"
+        elif os.path.isdir(os.path.join(continue_from_path, "fingerprints")):
+            pass_sub = os.path.join(continue_from_path, "fingerprints")
+            starts_with = "barcode_fpts_"
+            ends_with = ".npz"
+        else:
+            raise ValueError(
+                "No predictions or fingerprints found in continue_from directory. Cannot continue."
+            )
         for file in os.listdir(pass_sub):
-            if file.startswith("barcode_predictions_") and file.endswith(".csv"):
+            if file.startswith(starts_with) and file.endswith(ends_with):
                 bidx = int(file.split("_")[-1].split(".")[0])
                 max_pass_bidx = max(max_pass_bidx, bidx)
                 with open(os.path.join(pass_sub, file), "r") as f:
@@ -164,9 +175,20 @@ def handle_previous_results_retry(config: Config) -> Set[str]:
     processed_reads, _, _ = scan_processed_reads(
         config.input.retry_from, failed_only=True
     )
-    max_pass_bidx = determine_max_bidx_from_dir(
-        os.path.join(config.input.retry_from, "predictions")
-    )
+    if os.path.isdir(os.path.join(config.input.retry_from, "predictions")):
+        max_pass_bidx = determine_max_bidx_from_dir(
+            os.path.join(config.input.retry_from, "predictions")
+        )
+    elif os.path.isdir(
+        os.path.join(config.input.retry_from, "fingerprints")
+    ):  # prep workflow
+        max_pass_bidx = determine_max_bidx_from_dir(
+            os.path.join(config.input.retry_from, "fingerprints")
+        )
+    else:
+        raise ValueError(
+            "No predictions or fingerprints found in retry_from directory. Cannot retry."
+        )
     config.batch.bidx_pass = max_pass_bidx + 1
     config.batch.bidx_fail = 0
     return processed_reads

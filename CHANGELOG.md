@@ -1,3 +1,10 @@
+## Unreleased
+
+### Fixed
+
+- Fixed a bug in the `retry` subcommand following a previous `prep` run, where the previous results directory was ill-defined.
+
+
 ## [v0.4.5] - 2024-12-09
 
 ### Changed
