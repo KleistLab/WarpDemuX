@@ -14,7 +14,8 @@ import os
 import shutil
 import sys
 import uuid
-from typing import List, Optional
+from argparse import Action
+from typing import Any, Iterable, List, NamedTuple, Optional, Type, Union
 
 import pandas as pd
 import toml
@@ -42,136 +43,178 @@ def str2bool(v):
         raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
-parent_parser = argparse.ArgumentParser(
+class ArgumentParams(NamedTuple):
+    name_or_flags: "tuple[str, ...]"
+    action: Optional[Union[str, Type[Action]]] = None
+    nargs: Optional[Union[int, str]] = None
+    const: Any = None
+    default: Any = None
+    type: Optional[Any] = None
+    choices: Optional[Iterable[Any]] = None
+    required: bool = False
+    help: Optional[str] = None
+    metavar: Optional[Union[str, "tuple[str, ...]"]] = None
+    dest: Optional[str] = None
+
+    def add_to_parser(
+        self, parser: argparse.ArgumentParser, required: Optional[bool] = None
+    ):
+        params = self._asdict()
+        del params["name_or_flags"]
+        if required is not None:
+            params["required"] = required
+        parser.add_argument(*self.name_or_flags, **params)
+
+
+io_arguments = {
+    "input": ArgumentParams(
+        name_or_flags=("--input", "-i"),
+        type=str,
+        nargs="+",
+        help=("Input file(s) or directory(s)."),
+    ),
+    "output": ArgumentParams(
+        name_or_flags=("--output", "-o"),
+        type=str,
+        default=None,
+        help=(
+            "Path to where the run output folder should be created. "
+            "Default is the current working directory."
+        ),
+    ),
+    "save_fpts": ArgumentParams(
+        name_or_flags=("--save_fpts",),
+        type=str2bool,
+        default=False,
+        help=(
+            "Whether to save the barcode fingerprints as .npz files. "
+            "Default is False."
+        ),
+    ),
+    "save_dwell_times": ArgumentParams(
+        name_or_flags=("--save_dwell_times",),
+        type=str2bool,
+        default=False,
+        help=(
+            "Whether to save the dwell times per segment along with the fingerprints. "
+            "Ignored if --save_fpts is False. Default is False."
+        ),
+    ),
+    "save_boundaries": ArgumentParams(
+        name_or_flags=("--save_boundaries",),
+        type=str2bool,
+        default=False,
+        help=("Whether to save the boundaries as .csv files. Default is False."),
+    ),
+    "read_id_csv": ArgumentParams(
+        name_or_flags=("--read_id_csv", "-r"),
+        type=str,
+        default=None,
+        help=(
+            "Path to a csv file containing read IDs to be processed. "
+            "Should contain a 'read_id' column."
+        ),
+    ),
+    "read_id_csv_colname": ArgumentParams(
+        name_or_flags=("--read_id_csv_colname", "-c"),
+        type=str,
+        default="read_id",
+        help=(
+            "Column name in 'read_id_csv' containing the read IDs to be processed. "
+            "Defaults to 'read_id'."
+        ),
+    ),
+}
+
+config_arguments = {
+    "model_name": ArgumentParams(
+        name_or_flags=("--model_name", "-m"),
+        type=str,
+        default="WDX4_rna004_v0_4_4",
+        help=(
+            "Name of the model to use for classification. "
+            "The model name is directly linked to the preprocessing config that will be used, "
+            "see details in models/model_files/config.toml."
+        ),
+    ),
+    "export": ArgumentParams(
+        name_or_flags=("--export", "-e"),
+        type=str,
+        default=None,
+        help=(
+            "Export custom configuration in format 'section.param=value1,section.param=value2'. "
+            "Example: '--export cnn_boundaries.fallback_to_llr_short_reads=true,cnn_boundaries.polya_cand_k=15'. "
+            "Alternatively, you can provide a path to a toml file containing the custom configuration. "
+            "Example: '--export /path/to/config.toml'. "
+            "Exported values will override the default values in the model config. None specified values will be left unchanged. "
+            "Only use this argument if you know what you are doing. "
+            "Default is None."
+        ),
+    ),
+}
+
+batch_arguments = {
+    "ncores": ArgumentParams(
+        name_or_flags=("--ncores", "-j"),
+        type=int,
+        help=("Number of cores to use for parallel processing."),
+    ),
+    "batch_size_output": ArgumentParams(
+        name_or_flags=("--batch_size_output", "-b"),
+        type=int,
+        default=4000,
+        help=("Number of reads per output file. Default is 4000."),
+    ),
+    "minibatch_size": ArgumentParams(
+        name_or_flags=("--minibatch_size", "-s"),
+        type=int,
+        default=1000,
+        help=("Number of reads per minibatch. Default is 1000."),
+    ),
+}
+
+io_parser = argparse.ArgumentParser(
+    add_help=False,
+)
+config_parser = argparse.ArgumentParser(
+    add_help=False,
+)
+batch_parser = argparse.ArgumentParser(
     add_help=False,
 )
 
-parent_parser.add_argument(
-    "--input",
-    "-i",
-    type=str,
-    nargs="+",
-    help=("Input file(s) or directory(s)."),
-)
-parent_parser.add_argument(
-    "--output",
-    "-o",
-    type=str,
-    default=None,
-    help="Path to where the run output folder should be created. Default is the current working directory.",
-)
 
-parent_parser.add_argument(
-    "-m",
-    "--model_name",
-    type=str,
-    default="WDX4_rna004_v0_4_4",
-    help="Name of the model to use for classification. Default is `WDX4_rna004_v0_4_4`.",
-)
+for io_param in io_arguments:
+    io_arguments[io_param].add_to_parser(io_parser)
 
-parent_parser.add_argument(
-    "-e",
-    "--export",
-    type=str,
-    default=None,
-    help=(
-        "Export custom configuration in format 'section.param=value1,section.param=value2'. "
-        "Example: '--export cnn_boundaries.fallback_to_llr_short_reads=true,cnn_boundaries.polya_cand_k=15'. "
-        "Alternatively, you can provide a path to a toml file containing the custom configuration. "
-        "Example: '--export /path/to/config.toml'. "
-        "Only use this argument if you know what you are doing. Default is None."
-    ),
-)
+for config_param in config_arguments:
+    config_arguments[config_param].add_to_parser(config_parser)
 
-parent_parser.add_argument(
-    "--save_fpts",
-    type=str2bool,
-    default=False,
-    help="Whether to save the barcode fingerprints as .npz files. Default is False.",
-)
+for batch_param in batch_arguments:
+    batch_arguments[batch_param].add_to_parser(batch_parser)
 
-parent_parser.add_argument(
-    "--save_dwell_times",
-    type=str2bool,
-    default=False,
-    help="Whether to save the dwell times per segment along with the fingerprints. Ignored if --save_fpts is False. Default is False.",
-)
-
-parent_parser.add_argument(
-    "--save_boundaries",
-    type=str2bool,
-    default=False,
-    help="Whether to save the boundaries as .csv files. Default is False.",
-)
-
-parent_parser.add_argument(
-    "-j",
-    "--ncores",
-    type=int,
-    default=None,
-    help=(
-        "Number of num_proc to use for parallel processing. If not specified, all"
-        " available cores will be used."
-    ),
-)
-
-parent_parser.add_argument(
-    "-b",
-    "--batch_size_output",
-    type=int,
-    default=4000,
-    help=("Number of reads per output file. Default is 4000."),
-)
-
-parent_parser.add_argument(
-    "-s",
-    "--minibatch_size",
-    type=int,
-    default=1000,
-    help=("Number of reads per minibatch. Default is 1000."),
-)
-
-parent_parser.add_argument(
-    "--read_id_csv",
-    type=str,
-    default=None,
-    help=(
-        "Path to a csv file containing read IDs to be processed. Should contain a"
-        " 'read_id' column."
-    ),
-)
-
-parent_parser.add_argument(
-    "--read_id_csv_colname",
-    type=str,
-    default="read_id",
-    help=(
-        "Column name in 'read_id_csv' containing the read IDs to be processed. Defaults"
-        " to 'read_id'."
-    ),
-)
 parser = argparse.ArgumentParser(
     description="WarpDemuX: Adapter barcode classification for nanopore direct RNA sequencing.",
 )
-
 
 subparsers = parser.add_subparsers(title="workflows", dest="command")
 
 demux_parser = subparsers.add_parser(
     "demux",
     help="Demultiplex raw signal or preprocessed barcode fingerprints.",
-    parents=[parent_parser],
+    parents=[io_parser, config_parser, batch_parser],
 )
 
 prep_parser = subparsers.add_parser(
     "prep",
     help="Prepare data for WarpDemuX. This ignores most model-specific parameters.",
-    parents=[parent_parser],
+    parents=[io_parser, config_parser, batch_parser],
 )
 
 continue_parser = subparsers.add_parser(
     "continue",
     help="Continue from a previous (incomplete) run.",
+    parents=[batch_parser],
 )
 
 continue_parser.add_argument(
@@ -180,10 +223,10 @@ continue_parser.add_argument(
     help="Path to a previous WarpDemuX output directory to continue processing from.",
 )
 
-
 parser_retry = subparsers.add_parser(
     "retry",
     help="Retry processing failed reads.",
+    parents=[batch_parser],
 )
 
 parser_retry.add_argument(
@@ -292,7 +335,6 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
         run_dir = args.retry_from
         args.__dict__.update(command_dict)  # update all params, including `command`
 
-        run_dir = args.retry_from
     else:
         args.output = args.output or os.getcwd()
 
