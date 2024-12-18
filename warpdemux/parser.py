@@ -71,6 +71,7 @@ io_arguments = {
         name_or_flags=("--input", "-i"),
         type=str,
         nargs="+",
+        required=True,
         help=("Input file(s) or directory(s)."),
     ),
     "output": ArgumentParams(

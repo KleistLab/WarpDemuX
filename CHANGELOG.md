@@ -1,9 +1,12 @@
 ## Unreleased
 
+### Changed
+
+- command line argument `--input`/`-i` is now required for the `demux` and `prep` subcommands.
+
 ### Fixed
 
 - Fixed a bug in the `retry` subcommand following a previous `prep` run, where the previous results directory was ill-defined.
-
 
 ## [v0.4.5] - 2024-12-09
 
