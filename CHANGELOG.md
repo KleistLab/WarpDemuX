@@ -3,6 +3,7 @@
 ### Changed
 
 - command line argument `--input`/`-i` is now required for the `demux` and `prep` subcommands.
+- command line argument `--model_name`/`-m` is now required for the `demux` and `prep` subcommands.
 
 ### Fixed
 

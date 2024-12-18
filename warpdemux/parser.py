@@ -31,6 +31,7 @@ from warpdemux.config.file_proc import (
     TaskConfig,
 )
 from warpdemux.config.utils import get_model_spc_config
+from warpdemux.models.utils import available_models
 
 
 def str2bool(v):
@@ -123,7 +124,8 @@ config_arguments = {
     "model_name": ArgumentParams(
         name_or_flags=("--model_name", "-m"),
         type=str,
-        default="WDX4_rna004_v0_4_4",
+        required=True,
+        choices=available_models(),
         help=(
             "Name of the model to use for classification. "
             "The model name is directly linked to the preprocessing config that will be used, "
