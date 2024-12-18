@@ -17,6 +17,7 @@ import uuid
 from argparse import Action
 from typing import Any, Iterable, List, NamedTuple, Optional, Type, Union
 
+import numpy as np
 import pandas as pd
 import toml
 from adapted.io_utils import input_to_filelist
@@ -114,15 +115,6 @@ io_arguments = {
         help=(
             "Path to a csv file containing read IDs to be processed. "
             "Should contain a 'read_id' column."
-        ),
-    ),
-    "read_id_csv_colname": ArgumentParams(
-        name_or_flags=("--read_id_csv_colname", "-c"),
-        type=str,
-        default="read_id",
-        help=(
-            "Column name in 'read_id_csv' containing the read IDs to be processed. "
-            "Defaults to 'read_id'."
         ),
     ),
 }
@@ -352,9 +344,11 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
     read_ids = []
 
     if args.read_id_csv is not None:
-        read_ids = pd.read_csv(
-            args.read_id_csv,
-        )[args.read_id_csv_colname].values
+        read_ids = np.array(
+            pd.read_csv(
+                args.read_id_csv,
+            )["read_id"].values
+        )
 
     endswiths = [".pod5"]
     basenameprefix = ""

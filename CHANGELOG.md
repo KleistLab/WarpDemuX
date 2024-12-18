@@ -8,6 +8,10 @@
 
 - Fixed a bug in the `retry` subcommand following a previous `prep` run, where the previous results directory was ill-defined.
 
+### Removed
+
+- Removed the `read_id_csv_colname` argument. When providing an `read_id_csv` file, the file has to contain a `read_id` column.
+
 ## [v0.4.5] - 2024-12-09
 
 ### Changed
