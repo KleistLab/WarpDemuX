@@ -59,12 +59,17 @@ class ArgumentParams(NamedTuple):
     dest: Optional[str] = None
 
     def add_to_parser(
-        self, parser: argparse.ArgumentParser, required: Optional[bool] = None
+        self,
+        parser: argparse.ArgumentParser,
+        required: Optional[bool] = None,
+        use_default: Optional[bool] = True,
     ):
         params = self._asdict()
         del params["name_or_flags"]
         if required is not None:
             params["required"] = required
+        if use_default:
+            params["default"] = self.default
         parser.add_argument(*self.name_or_flags, **params)
 
 
@@ -137,7 +142,7 @@ config_arguments = {
         type=str,
         default=None,
         help=(
-            "Export custom configuration in format 'section.param=value1,section.param=value2'. "
+            "Export custom signal processing configuration in format 'section.param=value1,section.param=value2'. "
             "Example: '--export cnn_boundaries.fallback_to_llr_short_reads=true,cnn_boundaries.polya_cand_k=15'. "
             "Alternatively, you can provide a path to a toml file containing the custom configuration. "
             "Example: '--export /path/to/config.toml'. "
@@ -152,6 +157,7 @@ batch_arguments = {
     "ncores": ArgumentParams(
         name_or_flags=("--ncores", "-j"),
         type=int,
+        required=True,
         help=("Number of cores to use for parallel processing."),
     ),
     "batch_size_output": ArgumentParams(
@@ -178,6 +184,10 @@ batch_parser = argparse.ArgumentParser(
     add_help=False,
 )
 
+parser_second_tier = argparse.ArgumentParser(
+    add_help=False,
+)
+
 
 for io_param in io_arguments:
     io_arguments[io_param].add_to_parser(io_parser)
@@ -187,6 +197,14 @@ for config_param in config_arguments:
 
 for batch_param in batch_arguments:
     batch_arguments[batch_param].add_to_parser(batch_parser)
+
+    batch_arguments[batch_param].add_to_parser(
+        parser_second_tier, required=False, use_default=False
+    )
+
+config_arguments["model_name"].add_to_parser(
+    parser_second_tier, required=False, use_default=False
+)
 
 parser = argparse.ArgumentParser(
     description="WarpDemuX: Adapter barcode classification for nanopore direct RNA sequencing.",
@@ -209,7 +227,7 @@ prep_parser = subparsers.add_parser(
 continue_parser = subparsers.add_parser(
     "continue",
     help="Continue from a previous (incomplete) run.",
-    parents=[batch_parser],
+    parents=[parser_second_tier],
 )
 
 continue_parser.add_argument(
@@ -218,16 +236,16 @@ continue_parser.add_argument(
     help="Path to a previous WarpDemuX output directory to continue processing from.",
 )
 
-parser_retry = subparsers.add_parser(
-    "retry",
-    help="Retry processing failed reads.",
-    parents=[batch_parser],
+predict_parser = subparsers.add_parser(
+    "predict",
+    help="Predict barcode identities from preprocessed barcode fingerprints.",
+    parents=[parser_second_tier],
 )
 
-parser_retry.add_argument(
-    "retry_from",
+predict_parser.add_argument(
+    "predict_from",
     type=str,
-    help="Path to a folder containing the results of a previous run.",
+    help="Path to a previous WarpDemuX output directory to continue processing from.",
 )
 
 
@@ -279,56 +297,96 @@ def parse_export_string(export_str):
             )
 
 
+def backup_file(file_path: str):
+    dir_path = os.path.dirname(file_path)
+    basename = os.path.basename(file_path)
+    name, extension = os.path.splitext(basename)
+    backup_path = lambda suffix: os.path.join(
+        dir_path, f"{name}_previous{suffix}.{extension}"
+    )
+    suffix = ""
+    while os.path.exists(backup_path(suffix)):
+        if suffix == "":
+            suffix = 1
+        else:
+            suffix += 1
+
+    shutil.copy(file_path, backup_path(suffix))
+
+
+def get_from_dir(cli_args: argparse.Namespace) -> str:
+    cli_vars = vars(cli_args)
+    from_dir_dict = {
+        "continue": cli_vars.get("continue_from", ""),
+        "predict": cli_vars.get("predict_from", ""),
+        "demux": "",
+        "prep": "",
+    }
+    return from_dir_dict[cli_args.command]
+
+
+def handle_second_tier_args(cli_args: argparse.Namespace) -> argparse.Namespace:
+    cli_vars = vars(cli_args)
+    from_dir = get_from_dir(cli_args)
+
+    try:
+        # load the parser arguments from the command.json file
+        with open(os.path.join(from_dir, "command.json"), "r") as f:
+            command_dict = json.load(f)
+    except FileNotFoundError:
+        parser.error(
+            "No command.json file found in the continue_from directory. "
+            "Please provide a valid continue-from directory."
+        )
+
+    # command_dict and its args.command attribute are leading.
+    # however, if specific processing arguments are provided at runtime, they are used instead
+    second_tier_args = [
+        action.dest for action in parser_second_tier._actions if action.dest != "help"
+    ]
+    for arg in second_tier_args:
+        if arg in cli_vars and cli_vars[arg] is not None:
+            command_dict[arg] = cli_vars[arg]
+    args = argparse.Namespace(**command_dict)
+    return args
+
+
 def parse_args(in_args: Optional[List[str]] = None) -> Config:
 
     args = in_args or sys.argv[1:]
     args = parser.parse_args(args)
 
-    if args.command == "continue":
-        try:
-            # load the parser arguments from the command.json file
-            with open(os.path.join(args.continue_from, "command.json"), "r") as f:
-                command_dict = json.load(f)
-        except FileNotFoundError:
-            parser.error(
-                "No command.json file found in the continue_from directory. "
-                "Please provide a valid continue-from directory."
-            )
+    cli_command = args.command
 
-        # create a backup of the command.json file
-        shutil.copy(
-            os.path.join(args.continue_from, "command.json"),
-            os.path.join(args.continue_from, "command_previous.json"),
-        )
+    mode_continue = False
+    continue_from_dir = ""
 
-        if "retry_from" in command_dict:
-            del command_dict["retry_from"]
+    second_tier_commands = ["continue", "predict"]
+    if cli_command in second_tier_commands:
+        from_dir = get_from_dir(args)
 
-        run_dir = args.continue_from
-        args.__dict__.update(command_dict)  # update all params, including `command`
-    elif args.command == "retry":
-        try:
-            # load the parser arguments from the command.json file
-            with open(os.path.join(args.retry_from, "command.json"), "r") as f:
-                command_dict = json.load(f)
-        except FileNotFoundError:
-            parser.error(
-                "No command.json file found in the retry_from directory. "
-                "Please provide a valid continue-from directory."
-            )
+        run_dir = from_dir
+        args = handle_second_tier_args(args)
 
-        # create a backup of the command.json file
-        shutil.copy(
-            os.path.join(args.retry_from, "command.json"),
-            os.path.join(args.retry_from, "command_previous.json"),
-        )
+        if cli_command == "continue":
+            continue_from_dir = from_dir
+            mode_continue = True
 
-        # if continue_from is set from a previous run, remove it from args
-        if "continue_from" in command_dict:
-            del command_dict["continue_from"]
+        elif cli_command == "predict":
+            if os.path.exists(os.path.join(from_dir, "predictions")):
+                raise ValueError(
+                    "Prediction directory already exists, use continue instead."
+                )
 
-        run_dir = args.retry_from
-        args.__dict__.update(command_dict)  # update all params, including `command`
+            if args.command != "prep":  # has been updated in handle_second_tier_args
+                raise ValueError("Cannot predict from a non-prep run.")
+
+            args.command = "predict"  # overwrite command back to predict
+            args.input = [os.path.join(run_dir, "fingerprints")]
+
+            backup_file(os.path.join(run_dir, "command.json"))
+
+        # At this point, args.command is the command to be executed
 
     else:
         args.output = args.output or os.getcwd()
@@ -343,6 +401,9 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
             + str(uuid.uuid4())[:8],
         )
 
+    do_predict = args.command in ["demux", "predict"]
+    do_preproc = args.command in ["demux", "prep"]
+
     read_ids = []
 
     if args.read_id_csv is not None:
@@ -352,8 +413,12 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
             )["read_id"].values
         )
 
-    endswiths = [".pod5"]
-    basenameprefix = ""
+    if do_preproc:
+        endswiths = [".pod5"]
+        basenameprefix = ""
+    else:
+        endswiths = [".npz"]
+        basenameprefix = "barcode_fpts_"
 
     files = input_to_filelist(
         args.input, endswiths=endswiths, basenameprefix=basenameprefix
@@ -367,16 +432,19 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
     input_config = InputConfig(
         files=files,
         read_ids=read_ids,
-        continue_from=args.continue_from if "continue_from" in args else "",
-        retry_from=args.retry_from if "retry_from" in args else "",
+        continue_from=continue_from_dir,
     )
 
-    num_proc = (args.ncores or os.cpu_count()) or -1
-
     batch_config = BatchConfig(
-        num_proc=num_proc,
+        num_proc=args.ncores,
         batch_size_output=args.batch_size_output,
         minibatch_size=args.minibatch_size,
+    )
+
+    task_config = TaskConfig(
+        command=args.command,
+        predict=do_predict,
+        preprocess=do_preproc,
     )
 
     if args.command == "prep":
@@ -386,61 +454,69 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
             save_fpts=True,
             save_boundaries=args.save_boundaries,
             save_predictions=False,
-            output_subdir_fail=(
-                "failed_reads_retry" if "retry_from" in args else "failed_reads"
-            ),
         )
-        task_config = TaskConfig(
-            predict=False,
-        )
-    else:
+
+    elif args.command == "demux":
         output_config = OutputConfig(
             output_dir=run_dir,
             save_dwell_time=args.save_dwell_times,
             save_fpts=args.save_fpts,
             save_boundaries=args.save_boundaries,
-            output_subdir_fail=(
-                "failed_reads_retry" if "retry_from" in args else "failed_reads"
-            ),
+            save_predictions=True,
         )
-        task_config = TaskConfig(
-            predict=True,
+    elif args.command == "predict":
+        output_config = OutputConfig(
+            output_dir=run_dir,
+            save_dwell_time=False,
+            save_fpts=False,
+            save_boundaries=False,
+            save_predictions=True,
         )
+    else:
+        raise ValueError("Invalid command.")  # should never happen
 
-    spc = get_model_spc_config(args.model_name)
+    if do_predict:
+        cc = ClassificationConfig(
+            model_name=args.model_name,
+        )
+    else:
+        cc = None
 
-    if args.export is not None:
-        update_dict = parse_export_string(args.export)
-        assert update_dict is not None
-        for (section, attr), value in update_dict.items():
-            section_dict = getattr(
-                spc, section
-            ).copy()  # Create a copy of the section dictionary
-            section_dict[attr] = value  # Update the value
-            setattr(spc, section, section_dict)  # Set the updated dictionary
+    if do_preproc:
+        spc = get_model_spc_config(args.model_name)
 
-    spc.update_primary_method()
-    spc.update_sig_preload_size()
+        if args.export is not None:
+            update_dict = parse_export_string(args.export)
+            assert update_dict is not None
+            for (section, attr), value in update_dict.items():
+                section_dict = getattr(
+                    spc, section
+                ).copy()  # Create a copy of the section dictionary
+                section_dict[attr] = value  # Update the value
+                setattr(spc, section, section_dict)  # Set the updated dictionary
 
-    cc = ClassificationConfig(
-        model_name=args.model_name,
-    )
+        spc.update_primary_method()
+        spc.update_sig_preload_size()
+
+    else:
+        spc = None
 
     config = Config(
         input=input_config,
         batch=batch_config,
         output=output_config,
-        sig_proc=spc,
-        classif=cc,
+        sig_proc=spc,  # type: ignore
+        classif=cc,  # type: ignore
         task=task_config,
-    )
+    )  # TODO: handle optional attributes
 
-    os.makedirs(run_dir, exist_ok=True)
+    if not mode_continue:
+        os.makedirs(run_dir, exist_ok=True)
 
-    # Create command.json file
-    command_dict = vars(args)
-    command_json_path = os.path.join(run_dir, "command.json")
-    with open(command_json_path, "w") as f:
-        json.dump(command_dict, f, indent=2)
+        # Create command.json file
+        command_dict = vars(args)
+        command_json_path = os.path.join(run_dir, "command.json")
+        with open(command_json_path, "w") as f:
+            json.dump(command_dict, f, indent=2)
 
     return config

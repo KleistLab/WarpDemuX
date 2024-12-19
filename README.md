@@ -62,59 +62,57 @@ Where:
 - `MODEL_NAME`: Model to use (see [Models](#models) section)
 - `NCORES`: Number of cores for parallel processing
 
-Make sure to set `NCORES`, especially when running on a cluster. If not specified, WarpDemuX might incorrectly assume all cores of the node are available to you, which affects the memory allocation and may lead to memory issues.
-
 For further instructions and options, run `warpdemux --help` and `warpdemux demux --help`.
 
-### Advanced Usage Options
-#### Fingerprinting
+## Workflow Options
+#### Fingerprinting (preprocessing only)
 
-To preprocess your data to obtain the fingerprint for each read, without running barcode prediction, use:
+Preprocess raw signals to obtain the barcode fingerprints, without performing barcode prediction.
+This is useful when you want to e.g. use different classification models on the same preprocessed data.
+
 
 ```{bash}
 warpdemux prep -i INPUT [INPUT ...] -o OUTPUT -m MODEL_NAME -j NCORES ...
 ```
 
-Use `--export /path/to/valid/config.toml` to specify a custom config file for the preprocessing step, e.g. when you are developing a new model.
+Use `--export /path/to/valid/config.toml` to specify a custom config file for the preprocessing step, e.g. when you are developing a new model. 
 
-#### Handling Short Reads in RNA004
+See `warpdemux prep --help` for more information.
 
-
-The CNN adapter detection method used for RNA004 has limitations when processing short reads where the adapter signal comprises approximately half of the total signal length. This is due to interference with signal normalization. There are two approaches to handle this:
-
-
-1. **Enable LLR Fallback (During Initial Run, default)**
-   - By default, WarpDemuX enables automatic fallback to the more sensitive LLR method for short reads
-   - Note: This can significantly increase runtime if your data contains many adapter-only reads
-   - You can disable this behavior by setting the `--export cnn_boundaries.fallback_to_llr_short_reads=false` runtime argument
-   
-2. **Process Failed Reads Separately**
-   - Run WarpDemuX with default or disabled LLR fallback settings first
-   - Then use the retry functionality to process failed reads (see below)
-   - This may be preferential when you know upfront that you have many short reads in your data
-
-#### Continuing Interrupted Runs
-Use the `continue` subcommand to resume an interrupted run:
+#### Prediction Only (predict)
+Run barcode predictions on previously preprocessed fingerprints:
 
 ```{bash}
-warpdemux continue /path/to/previous/run/output/WDX[n_barcodes]_[chemistry]_[version]_[UUID]
+warpdemux predict PREDICT_FROM_DIR
 ```
+Where `PREDICT_FROM_DIR` is the `/path/to/warpdemux/output` directory, containing the `command.json` file. You can only run this command if you have previously run the `prep` command.
 
-To modify performance parameters before continuing:
-1. Locate the `command.json` file in the previous run's output folder
-2. Edit performance parameters (e.g., batch size, number of processes)
-3. Important: Do not modify processing parameters as this may cause failures
+See `warpdemux predict --help` for more information.
 
-
-#### Recovering Failed Reads
-
-For RNA004 runs, you can attempt to recover failed reads using a more sensitive detection method:
+#### Continue Previous Run (continue)
+Resume an interrupted run with optional runtime parameter updates:
 
 ```{bash}
-warpdemux retry /path/to/previous/run/output/WDX[n_barcodes]_[chemistry]_[version]_[UUID]
+warpdemux continue CONTINUE_FROM_DIR
 ```
+Where `CONTINUE_FROM_DIR` is the `/path/to/warpdemux/output` directory, containing the `command.json` file. You can continue `prep`, `demux` and `predict` runs.
 
-Recovered reads are added to the main output folder. Note that retrying also improves yield for non-short reads.
+See `warpdemux continue --help` for more information.
+
+## Advanced Usage
+### Handling Short Reads in RNA004
+
+
+The CNN adapter detection method used for RNA004 has limitations when processing short reads where the adapter signal comprises approximately half of the total signal length. This is due to interference with signal normalization. 
+
+By default, WarpDemuX enables automatic fallback to the more sensitive LLR method for short reads
+However, this can significantly increase runtime if your data contains many adapter-only reads. You can disable this behavior by setting the `--export cnn_boundaries.fallback_to_llr_short_reads=false` runtime argument
+  
+Alternatively, you can take a look at one of the other detection methods available. For example, the `rna_start_peak` method is more sensitive to short reads. `rna_start_peak` does currently not support poly(A) tail detection or validation of the detected boundaries.
+
+### Fallback detection to LLR
+
+When using the CNN or `rna_start_peak` methods, there is an automatic fallback to the LLR method for failed reads. You can turn this off by setting the `--export cnn_boundaries.fallback_to_llr=false` or `--export rna_start_peak.fallback_to_llr=false` runtime argument.
 
 ## Barcodes
 
@@ -197,7 +195,7 @@ Currently, you can apply target accuracy filtering post-prediction:
 2. Apply the desired confidence threshold from `target_accuracy_thresholds/*.csv`
 3. Filter predictions that meet or exceed the threshold
 
-*Note: Direct integration of accuracy modes into the main workflow is planned for a future release.*
+*Note: Direct integration of accuracy modes into the main workflow is planned for future release.*
 
 ### Choosing the Right Target
 
@@ -233,10 +231,10 @@ WarpDemuX exclusively supports the pod5 file format. You must convert any fast5/
 ### Output
 
 
-WarpDemuX creates an output directory named `WDX[n_barcodes]_[chemistry]_[version]_[UUID]` with the following structure:
+WarpDemuX creates an output directory named `WDX[n_barcodes]_[chemistry]_[version]_[date]_[time]_[UUID]` with the following structure:
 
 ```
-WDX[n_barcodes]_[chemistry]_[version]_[UUID]/
+WDX[n_barcodes]_[chemistry]_[version]_[date]_[time]_[UUID]/
 ├── failed_reads/ # Contains statistics for reads where adapter detection failed
 ├── predictions/ # Contains barcode predictions for successful reads
 └── detected_boundaries/ # Optional: Created when --save_boundaries true
@@ -287,8 +285,11 @@ The `failed_reads/` directory contains `failed_reads_[INDEX].csv` files with det
 - adapter_med_dt/mad_dt: Dwell time statistics. Median/median absolute deviation for the dwell time per translocation event in the adapter.
 - fail_reason: Specific cause of detection failure
 
+For a more detailed explanation of the failed reads output, please refer to the [ADAPTed documentation](https://github.com/KleistLab/ADAPTed/blob/main/README.md#output).
+
 ### Boundaries
 When `--save_boundaries true` is set, successfully detected boundaries are saved to `detected_boundaries_[INDEX].csv` files in the `detected_boundaries/` directory. These files contain the same columns as failed reads output, except for the `fail_reason` column.
+
 
 ## Basecalling and split reads
 

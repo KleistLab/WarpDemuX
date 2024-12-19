@@ -19,7 +19,7 @@ import sys
 import threading
 import time
 import traceback
-from typing import Callable, Dict, Generator, List, Set, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List, Set, Tuple, Union
 
 import joblib
 import numpy as np
@@ -124,73 +124,62 @@ def determine_max_bidx_from_dir(dir_path: str) -> int:
 
 
 def scan_processed_reads(
-    continue_from_path: str, failed_only: bool = False
+    continue_from_path: str, scan_failed: bool = False, result_type: str = "predictions"
 ) -> Tuple[Set[str], int, int]:
     processed_reads = set()
     max_pass_bidx = -1
     max_fail_bidx = -1
 
-    fail_sub = os.path.join(continue_from_path, "failed_reads")
-    for file in os.listdir(fail_sub):
-        if file.startswith("failed_reads_") and file.endswith(".csv"):
-            bidx = int(file.split("_")[-1].split(".")[0])
+    if result_type not in ["predictions", "fingerprints"]:
+        raise ValueError(
+            f"Invalid result_type: {result_type}. Must be 'predictions' or 'fingerprints'."
+        )
+
+    if scan_failed:
+        fail_sub = os.path.join(continue_from_path, "failed_reads")
+        for file in os.listdir(fail_sub):
+            if file.startswith("failed_reads_") and file.endswith(".csv"):
+                bidx = int(file.split("_")[-1].split(".")[0])
             max_fail_bidx = max(max_fail_bidx, bidx)
             with open(os.path.join(fail_sub, file), "r") as f:
                 processed_reads.update(line.split(",")[0] for line in f.readlines()[1:])
 
-    if not failed_only:
-        if os.path.isdir(os.path.join(continue_from_path, "predictions")):
-            pass_sub = os.path.join(continue_from_path, "predictions")
-            starts_with = "barcode_predictions_"
-            ends_with = ".csv"
-        elif os.path.isdir(os.path.join(continue_from_path, "fingerprints")):
-            pass_sub = os.path.join(continue_from_path, "fingerprints")
-            starts_with = "barcode_fpts_"
-            ends_with = ".npz"
-        else:
-            raise ValueError(
-                "No predictions or fingerprints found in continue_from directory. Cannot continue."
-            )
-        for file in os.listdir(pass_sub):
-            if file.startswith(starts_with) and file.endswith(ends_with):
-                bidx = int(file.split("_")[-1].split(".")[0])
-                max_pass_bidx = max(max_pass_bidx, bidx)
+    if result_type == "predictions":
+        pass_sub = os.path.join(continue_from_path, "predictions")
+        starts_with = "barcode_predictions_"
+        extension = "csv"
+    elif result_type == "fingerprints":
+        pass_sub = os.path.join(continue_from_path, "fingerprints")
+        starts_with = "barcode_fpts_"
+        extension = "npz"
+
+    for file in os.listdir(pass_sub):
+        if file.startswith(starts_with) and file.endswith(extension):
+            bidx = int(file.split("_")[-1].split(".")[0])
+            max_pass_bidx = max(max_pass_bidx, bidx)
+            if extension == "csv":
                 with open(os.path.join(pass_sub, file), "r") as f:
                     processed_reads.update(
                         line.split(",")[0] for line in f.readlines()[1:]
                     )
+            elif extension == "npz":
+                npz = np.load(os.path.join(pass_sub, file))
+                processed_reads.update(npz["read_ids"])
     return processed_reads, max_pass_bidx, max_fail_bidx
 
 
-def handle_previous_results(config: Config, failed_only: bool = False) -> Set[str]:
+def handle_previous_results(
+    config: Config,
+) -> Set[str]:
+
+    scan_failed = config.task.preprocess
+    result_type = "predictions" if config.task.predict else "fingerprints"
+
     processed_reads, max_pass_bidx, max_fail_bidx = scan_processed_reads(
-        config.input.continue_from, failed_only
+        config.input.continue_from, scan_failed, result_type
     )
     config.batch.bidx_pass = max_pass_bidx + 1
     config.batch.bidx_fail = max_fail_bidx + 1
-    return processed_reads
-
-
-def handle_previous_results_retry(config: Config) -> Set[str]:
-    processed_reads, _, _ = scan_processed_reads(
-        config.input.retry_from, failed_only=True
-    )
-    if os.path.isdir(os.path.join(config.input.retry_from, "predictions")):
-        max_pass_bidx = determine_max_bidx_from_dir(
-            os.path.join(config.input.retry_from, "predictions")
-        )
-    elif os.path.isdir(
-        os.path.join(config.input.retry_from, "fingerprints")
-    ):  # prep workflow
-        max_pass_bidx = determine_max_bidx_from_dir(
-            os.path.join(config.input.retry_from, "fingerprints")
-        )
-    else:
-        raise ValueError(
-            "No predictions or fingerprints found in retry_from directory. Cannot retry."
-        )
-    config.batch.bidx_pass = max_pass_bidx + 1
-    config.batch.bidx_fail = 0
     return processed_reads
 
 
@@ -240,7 +229,7 @@ def yield_signals_from_pod5(
     for filename in pod5_files:
         with Reader(filename) as file_obj:
             for read_record in file_obj.reads(selection=selection, missing_ok=True):
-                if read_record.read_id in read_ids_excl:
+                if str(read_record.read_id) in read_ids_excl:
                     continue
 
                 _m = min(m, read_record.num_samples)
@@ -270,7 +259,58 @@ def yield_signals_from_pod5(
         ]
 
 
-def worker_enqueue_minibatches(
+def yield_fpts_from_npz(
+    npz_files: Union[List[str], Set[str]],
+    read_ids_incl: Set[str],
+    read_ids_excl: Set[str],
+    batch_size: int,
+) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
+    if read_ids_incl and read_ids_excl:
+        read_ids_incl = read_ids_incl.difference(read_ids_excl)
+        read_ids_excl = set()
+
+    N = batch_size
+
+    fpts = np.empty((0, 0), dtype=np.float32)
+    read_ids = np.empty(0, dtype=object)
+
+    for filename in npz_files:
+        with np.load(filename) as data:
+            file_fpts = data["signals"]
+            file_read_ids = data["read_ids"]
+            # Get indices of excluded read_ids
+            if read_ids_excl:
+                exclude_idx = np.array(
+                    [i for i, rid in enumerate(file_read_ids) if rid in read_ids_excl]
+                )
+                file_fpts = np.delete(file_fpts, exclude_idx, axis=0)
+                file_read_ids = np.delete(file_read_ids, exclude_idx)
+            elif read_ids_incl:
+                include_idx = np.array(
+                    [i for i, rid in enumerate(file_read_ids) if rid in read_ids_incl]
+                )
+                file_fpts = file_fpts[include_idx]
+                file_read_ids = file_read_ids[include_idx]
+
+            if fpts.size > 0:
+                fpts = np.concatenate((fpts, file_fpts), axis=0)
+                read_ids = np.concatenate((read_ids, file_read_ids), axis=0)
+            else:
+                fpts = file_fpts
+                read_ids = file_read_ids
+
+            while len(fpts) >= N:
+                batch_fpts = fpts[:N].copy()
+                batch_read_ids = read_ids[:N].copy()
+                yield batch_fpts, batch_read_ids
+                fpts = fpts[N:]
+                read_ids = read_ids[N:]
+
+    if fpts.size > 0:
+        yield fpts, read_ids
+
+
+def worker_enqueue_minibatches_raw(
     files: Set[str],
     read_ids_incl: Set[str],
     read_ids_excl: Set[str],
@@ -294,6 +334,29 @@ def worker_enqueue_minibatches(
     logging.debug("Worker enqueue_minibatches finished")
 
 
+def worker_enqueue_minibatches_fpts(
+    npz_files: Set[str],
+    read_ids_incl: Set[str],
+    read_ids_excl: Set[str],
+    config: Config,
+    preloaded_minibatch_queue: multiprocessing.Queue,
+    ridx_dict: dict,
+    ridx_lock: multiprocessing.Lock,  # type: ignore
+):
+
+    for minibatch in yield_fpts_from_npz(
+        npz_files=npz_files,
+        read_ids_incl=read_ids_incl,
+        read_ids_excl=read_ids_excl,
+        batch_size=config.batch.minibatch_size,
+    ):
+        preloaded_minibatch_queue.put(minibatch)  # has maxsize
+        increment_ridx(ridx_dict, "enqueued", ridx_lock, len(minibatch[0]))
+
+    preloaded_minibatch_queue.put(None)  # signal end of work
+    logging.debug("Worker enqueue_minibatches finished")
+
+
 def worker_detect_and_predict_on_preloaded_signals(
     preloaded_minibatch,
     model_predict,
@@ -309,7 +372,7 @@ def worker_detect_and_predict_on_preloaded_signals(
     fail = []
     signals, _, full_lengths, read_ids = preloaded_minibatch
 
-    if config.input.retry_from or config.sig_proc.primary_method == "llr":
+    if config.sig_proc.primary_method == "llr":
         detect_results = combined_detect_llr2(
             batch_of_signals=signals,
             full_signal_lens=full_lengths,
@@ -369,6 +432,49 @@ def worker_detect_and_predict_on_preloaded_signals(
 
             save_predict_queue.put(predictions)
             increment_ridx(ridx_dict, "done_predict", ridx_lock, len(predictions))
+
+
+def worker_predict_on_preloaded_fpts(
+    preloaded_minibatch,
+    model_predict,
+    model_detect,  # unused
+    config,  # unused
+    ridx_dict,
+    ridx_lock,
+    save_pass_queue,  # unused
+    save_fail_queue,  # unused
+    save_predict_queue,
+):
+    """Process preloaded fingerprints through prediction model.
+
+    Args:
+        preloaded_minibatch: Tuple of (fingerprints array, read_ids list)
+        model_predict: Prediction model to use
+        model_detect: Unused, for compatibility with worker_detect_predict_on_preloaded_signals
+        config: Unused, for compatibility with worker_detect_predict_on_preloaded_signals
+        ridx_dict: Shared dictionary for read indices
+        ridx_lock: Lock for ridx_dict access
+        save_pass_queue: Unused, for compatibility with worker_detect_predict_on_preloaded_signals
+        save_fail_queue: Unused, for compatibility with worker_detect_predict_on_preloaded_signals
+        save_predict_queue: Queue to save prediction results to
+    """
+    assert model_detect is None, "model_detect should be None"
+    assert save_pass_queue is None, "save_pass_queue should be None"
+    assert save_fail_queue is None, "save_fail_queue should be None"
+    assert config is not None, "config should be provided"
+
+    fpts, read_ids = preloaded_minibatch
+
+    predictions = model_predict.predict(
+        fpts,
+        pbar=False,
+        nproc=1,
+        return_df=True,
+    )
+    predictions = add_read_id_col_to_predictions(predictions, read_ids)
+
+    save_predict_queue.put(predictions)
+    increment_ridx(ridx_dict, "done_predict", ridx_lock, len(predictions))
 
 
 def _queue_batch_processor_df(
@@ -509,7 +615,7 @@ def save_batch_outputs_pass(
 ):
     with bidx_lock:
         bidx = bidx_dict["pass"]
-    save_detect_fpts_batch(
+    save_detect_results(
         "pass",
         results=read_results,
         batch_idx=bidx,
@@ -526,7 +632,7 @@ def save_batch_outputs_fail(
 ):
     with bidx_lock:
         bidx = bidx_dict["fail"]
-    save_detect_fpts_batch(
+    save_detect_results(
         "fail",
         results=read_results,
         batch_idx=bidx,
@@ -553,7 +659,7 @@ def save_batch_predictions(
     del predictions
 
 
-def save_detect_fpts_batch(
+def save_detect_results(
     pass_or_fail: str,
     results: List[ReadResult],
     batch_idx: int,
@@ -586,7 +692,7 @@ def save_detect_fpts_batch(
         )
 
     if pass_or_fail == "pass" and save_fpts:
-        read_ids, signals, _ = save_processed_signals(
+        read_ids, signals, _ = save_fpts_signals(
             results,
             os.path.join(output_dir_fpts, f"barcode_fpts_{batch_idx}.npz"),
             save_dwell_time=save_dwell_time,
@@ -597,7 +703,7 @@ def save_detect_fpts_batch(
     return None
 
 
-def save_processed_signals(
+def save_fpts_signals(
     list_of_processing_results: List["ReadResult"],
     filename: str,
     save_dwell_time: bool = True,
@@ -612,13 +718,18 @@ def save_processed_signals(
     read_ids = np.array(read_ids)
     barcode_fpts = np.array(barcode_fpts)
     dwell_times = np.array(dwell_times)
+    num_reads = len(read_ids)
 
     if save_dwell_time:
         np.savez(
-            filename, read_ids=read_ids, signals=barcode_fpts, dwell_times=dwell_times
+            filename,
+            num_reads=num_reads,
+            read_ids=read_ids,
+            signals=barcode_fpts,
+            dwell_times=dwell_times,
         )
     else:
-        np.savez(filename, read_ids=read_ids, signals=barcode_fpts)
+        np.savez(filename, num_reads=num_reads, read_ids=read_ids, signals=barcode_fpts)
 
     return read_ids, barcode_fpts, dwell_times
 
@@ -662,7 +773,7 @@ def worker_progress_report(ridx_dict, ridx_lock, save_predictions: bool = True):
         total=total_reads if total_reads_set else None,
     )
     pbar_fail = tqdm(
-        desc="Failed reads  ",
+        desc="Failed reads",
         position=1,
         total=total_reads if total_reads_set else None,
         bar_format="{desc}",  # Custom format without speed
@@ -679,7 +790,7 @@ def worker_progress_report(ridx_dict, ridx_lock, save_predictions: bool = True):
     time_passed = 0
 
     while not _STOP_SIGNAL.is_set():
-        if time_passed >= 10:  # update every 10 seconds
+        if time_passed >= 1:  # update every second
             if not total_reads_set:
                 total_reads = get_global_var("total_reads")
                 total_reads_set = total_reads != -1
@@ -708,7 +819,7 @@ def worker_progress_report(ridx_dict, ridx_lock, save_predictions: bool = True):
                     fail_pct = (n_fail / n_total) * 100
                     success_pct = (n_success / n_total) * 100
                     pbar_fail.set_description_str(
-                        f"Failed reads      {n_fail:,} | {fail_pct:.1f}%"
+                        f"Failed reads   {n_fail:,} | {fail_pct:.1f}%"
                     )
                     pbar_success.set_description_str(
                         f"{success_str.capitalize()}ed reads   {n_success:,} | {success_pct:.1f}%"
@@ -736,7 +847,7 @@ def worker_progress_report(ridx_dict, ridx_lock, save_predictions: bool = True):
             fail_pct = (n_fail / n_total) * 100
             success_pct = (n_success / n_total) * 100
             pbar_fail.set_description_str(
-                f"Failed reads      {n_fail:,} | {fail_pct:.1f}%"
+                f"Failed reads   {n_fail:,} | {fail_pct:.1f}%"
             )
             pbar_success.set_description_str(
                 f"{success_str.capitalize()}ed reads   {n_success:,} | {success_pct:.1f}%"
@@ -788,7 +899,65 @@ def check_total_num_reads(pod5_files: Set[str]) -> int:
     return total_reads
 
 
+def check_total_num_fpts(npz_files: Set[str]) -> int:
+    """Count total number of fpts across all npz files."""
+
+    total_fpts = 0
+
+    python_exec = os.path.join(sys.exec_prefix, "bin", "python")
+    logging.debug(f"python_exec: {python_exec}")
+
+    cmd = (
+        lambda file: f"""import numpy as np
+with np.load("{file}", allow_pickle=True) as npz:
+    try:
+        print(npz["num_reads"])
+    except:
+        print(npz["read_ids"].size)
+"""
+    )
+
+    for file in npz_files:
+        try:
+            # Run pod5 inspect command and capture output
+            result = subprocess.run(
+                [python_exec, "-c", cmd(file)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Error running python script on {file}: {e}")
+            logging.error(f"stdout: {e.stdout}")
+            logging.error(f"stderr: {e.stderr}")
+            raise
+
+        try:
+            num_fpts = int(result.stdout.strip())
+            total_fpts += num_fpts
+
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Error parsing python script output on {file}: {e}")
+            raise
+
+    return total_fpts
+
+
+# TODO: if read_ids_incl contains read_ids that are not in the files, total_reads will be incorrect
+# TODO: if read_ids_excl contains read_ids that are not in the files, total_reads will be incorrect
 def set_total_num_reads(
+    files: Set[str], read_ids_incl: Set[str], read_ids_excl: Set[str]
+) -> None:
+
+    if any(file.endswith(".pod5") for file in files):
+        set_total_num_reads_pod5(files, read_ids_incl, read_ids_excl)
+    elif any(file.endswith(".npz") for file in files):
+        set_total_num_reads_npz(files, read_ids_incl, read_ids_excl)
+    else:
+        raise ValueError("No POD5 or NPZ files found in the input")
+
+
+def set_total_num_reads_pod5(
     pod5_files: Set[str], read_ids_incl: Set[str], read_ids_excl: Set[str]
 ) -> None:
     if read_ids_incl:
@@ -799,7 +968,17 @@ def set_total_num_reads(
     set_global_var("total_reads", total_reads)
     logging.debug(f"total_reads: {total_reads}")
 
-    # logging.info(f"Total number of reads that will be processed: {total_reads}")
+
+def set_total_num_reads_npz(
+    npz_files: Set[str], read_ids_incl: Set[str], read_ids_excl: Set[str]
+) -> None:
+    if read_ids_incl:
+        total_fpts = len(read_ids_incl)
+    else:
+        total_fpts_npz = check_total_num_fpts(npz_files)
+        total_fpts = total_fpts_npz - len(read_ids_excl)
+    set_global_var("total_reads", total_fpts)
+    logging.debug(f"total_reads: {total_fpts}")
 
 
 # TODO: move models
@@ -810,7 +989,7 @@ def load_model(model_name: str) -> DTW_SVM_Model:
 
 def run_demux(
     files: Set[str], read_ids_incl: Set[str], read_ids_excl: Set[str], config: Config
-) -> None:
+) -> Dict[str, Any]:
     """enqueue_minibatches_thread takes care of preloading the signals in the queue.
     Maxsize of queue is set to num_proc. Detect is the most time consuming step, we want to limit the signal preloading to be in sync with the speed of detect.
     """
@@ -819,6 +998,7 @@ def run_demux(
     save_predictions = config.output.save_predictions
 
     save_pass_thread = None
+    save_fail_thread = None
     save_predict_thread = None
 
     # set global variables for batch indices for continue mode
@@ -830,19 +1010,25 @@ def run_demux(
 
     logging.debug(f"starting mp manager")
     with multiprocessing.Manager() as manager:
-        assert (
-            config.classif is not None
-        ), "Classification configuration not provided"  # make linter happy
-        model_predict = load_model(config.classif.model_name)
-
-        if config.sig_proc.primary_method != "cnn" or config.input.retry_from:
-            model_detect = None
+        if config.task.predict:
+            assert (
+                config.classif is not None
+            ), "Classification configuration not provided"  # make linter happy
+            model_predict = load_model(config.classif.model_name)
         else:
-            model_detect = load_cnn_model(config.sig_proc.cnn_boundaries.model_name)
+            model_predict = None
+
+        if config.task.preprocess:
+            if config.sig_proc.primary_method != "cnn":
+                model_detect = None
+            else:
+                model_detect = load_cnn_model(config.sig_proc.cnn_boundaries.model_name)
+        else:
+            model_detect = None
 
         preloaded_minibatch_queue = manager.Queue(maxsize=config.batch.num_proc)
         save_pass_queue = manager.Queue() if save_output_pass else None
-        save_fail_queue = manager.Queue()
+        save_fail_queue = manager.Queue() if config.task.preprocess else None
         save_predict_queue = manager.Queue() if save_predictions else None
 
         ridx_lock = manager.Lock()
@@ -871,8 +1057,14 @@ def run_demux(
             args=(files, read_ids_incl, read_ids_excl),
         )
 
+        target_enqueue_minibatches = (
+            worker_enqueue_minibatches_raw
+            if config.task.preprocess
+            else worker_enqueue_minibatches_fpts
+        )
+
         enqueue_minibatches_thread = threading.Thread(
-            target=worker_enqueue_minibatches,
+            target=target_enqueue_minibatches,
             args=(
                 files,
                 read_ids_incl,
@@ -902,19 +1094,24 @@ def run_demux(
             else None
         )
 
-        save_fail_thread = threading.Thread(
-            target=queue_batch_processor,
-            args=(
-                save_fail_queue,
-                save_batch_outputs_fail,
-                ridx_dict,
-                "saved_fail",
-                ridx_lock,
-                bidx_dict,
-                bidx_lock,
-                config,
-            ),
+        save_fail_thread = (
+            threading.Thread(
+                target=queue_batch_processor,
+                args=(
+                    save_fail_queue,
+                    save_batch_outputs_fail,
+                    ridx_dict,
+                    "saved_fail",
+                    ridx_lock,
+                    bidx_dict,
+                    bidx_lock,
+                    config,
+                ),
+            )
+            if config.task.preprocess
+            else None
         )
+
         # save predictions
         save_predict_thread = (
             threading.Thread(
@@ -949,7 +1146,8 @@ def run_demux(
 
         if save_output_pass and save_pass_thread:
             save_pass_thread.start()
-        save_fail_thread.start()
+        if config.task.preprocess and save_fail_thread:
+            save_fail_thread.start()
         if save_predictions and save_predict_thread:
             save_predict_thread.start()
         enqueue_minibatches_thread.start()
@@ -969,6 +1167,12 @@ def run_demux(
         # not done logic is used to manage the number of concurrent jobs and the preloaded queue
         # when a job is started, it takes from the preloaded queue
         # submitting all jobs at once would require a large memory footprint for the preloaded queue
+
+        target_process_pool = (
+            worker_detect_and_predict_on_preloaded_signals
+            if config.task.preprocess
+            else worker_predict_on_preloaded_fpts
+        )
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=config.batch.num_proc,
         ) as process_pool:
@@ -1005,7 +1209,7 @@ def run_demux(
                         break  # all minibatches have been submitted to the worker pool
 
                     future = process_pool.submit(
-                        worker_detect_and_predict_on_preloaded_signals,
+                        target_process_pool,
                         minibatch,
                         model_predict,
                         model_detect,
@@ -1045,7 +1249,8 @@ def run_demux(
         logging.debug("Waiting for save threads to finish")
 
         total_reads_thread.join()
-        save_fail_thread.join()
+        if save_fail_thread:
+            save_fail_thread.join()
         if save_pass_thread:
             save_pass_thread.join()
         if save_predict_thread:
@@ -1059,8 +1264,16 @@ def run_demux(
 
         success_str = "predict" if save_predictions else "pass"
         if ridx_dict[f"done_{success_str}"] > 0:
+            if config.task.preprocess:
+                pretext = "Adapter was successfully detected in"
+            else:
+                pretext = "Predictions were successfully generated in"
             logging.info(
-                f"Adapter was successfully detected in {ridx_dict[f'done_{success_str}']} / { ridx_dict['done_fail'] + ridx_dict[f'done_{success_str}']} reads  ({ridx_dict[f'done_{success_str}'] / ridx_dict['enqueued'] * 100:.2f}%)."
+                f"{pretext} {ridx_dict[f'done_{success_str}']} / "
+                f"{ridx_dict['done_fail'] + ridx_dict[f'done_{success_str}']} reads  "
+                f"({ridx_dict[f'done_{success_str}'] / ridx_dict['enqueued'] * 100:.2f}%)."
             )
         else:
             logging.info(f"All reads failed.")
+
+        return dict(ridx_dict)
