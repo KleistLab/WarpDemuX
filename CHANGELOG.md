@@ -1,9 +1,20 @@
 ## Unreleased
 
-### Fixed
+### Changed
 
-- Fixed a bug in the `retry` subcommand following a previous `prep` run, where the previous results directory was ill-defined.
+- command line argument `--input`/`-i` is now required for the `demux` and `prep` subcommands.
+- command line argument `--model_name`/`-m` is now required for the `demux` and `prep` subcommands.
+- The progress bar now updates every second, rather than every 10 seconds.
+- You can now change certain parameters at the command line when running `continue`. Available parameters are: `num_proc`, `batch_size_output`, `minibatch_size` and `model_name`. The same holds for the `predict` subcommand, see below.
 
+### Added
+
+- The `predict` subcommand has been added. It can be used to predict barcodes for previously preprocessed reads (subcommand `prep`).
+
+### Removed
+
+- Removed the `read_id_csv_colname` argument. When providing an `read_id_csv` file, the file has to contain a `read_id` column.
+- The `retry` subcommand has been removed. `adapted` now handles retrying failed reads during the initial run. You can turn automatic retrying on by setting the `fallback_to_llr` parameter in the `cnn_boundaries` or `start_peak_detection` sections of the config file.
 
 ## [v0.4.5] - 2024-12-09
 
