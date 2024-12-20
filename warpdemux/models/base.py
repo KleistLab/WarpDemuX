@@ -99,8 +99,10 @@ class BaseDTWModel(ABC):
 
         thresholds = self.cal_dict[tam]
 
+        # TODO: handle noise class
         pred_idx = np.argmax(prob, axis=1)
-        mask = prob[np.arange(prob.shape[0]), pred_idx] < thresholds[pred_idx]
+        conf = confidence_margin(prob)
+        mask = conf < thresholds[pred_idx]
         return mask
 
     def predictions_to_df(self, y_pred: np.ndarray, y_prob: np.ndarray) -> pd.DataFrame:
