@@ -14,6 +14,7 @@ import os
 import shutil
 import sys
 import uuid
+import warnings
 from argparse import Action
 from typing import Any, Iterable, List, NamedTuple, Optional, Type, Union
 
@@ -346,6 +347,12 @@ def handle_second_tier_args(cli_args: argparse.Namespace) -> argparse.Namespace:
     ]
     for arg in second_tier_args:
         if arg in cli_vars and cli_vars[arg] is not None:
+            if arg == "model_name":
+                warnings.warn(
+                    "Model is changed in second tier, unable to validate compatibility with the previous run. Make sure you know what you are doing!",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
             command_dict[arg] = cli_vars[arg]
     args = argparse.Namespace(**command_dict)
     return args
