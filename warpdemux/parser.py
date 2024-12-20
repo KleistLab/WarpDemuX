@@ -315,7 +315,7 @@ def backup_file(file_path: str):
     shutil.copy(file_path, backup_path(suffix))
 
 
-def get_from_dir(cli_args: argparse.Namespace) -> str:
+def get_first_tier_dir(cli_args: argparse.Namespace) -> str:
     cli_vars = vars(cli_args)
     from_dir_dict = {
         "continue": cli_vars.get("continue_from", ""),
@@ -328,7 +328,7 @@ def get_from_dir(cli_args: argparse.Namespace) -> str:
 
 def handle_second_tier_args(cli_args: argparse.Namespace) -> argparse.Namespace:
     cli_vars = vars(cli_args)
-    from_dir = get_from_dir(cli_args)
+    from_dir = get_first_tier_dir(cli_args)
 
     try:
         # load the parser arguments from the command.json file
@@ -370,7 +370,7 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
 
     second_tier_commands = ["continue", "predict"]
     if cli_command in second_tier_commands:
-        from_dir = get_from_dir(args)
+        from_dir = get_first_tier_dir(args)
 
         run_dir = from_dir
         args = handle_second_tier_args(args)
