@@ -1,0 +1,101 @@
+diff --color -Nu read_until_api_v3.4.1/read_until/base.py read_until_api_patched/read_until/base.py
+--- read_until_api_v3.4.1/read_until/base.py	2025-01-13 16:29:37.453641776 +0100
++++ read_until_api_patched/read_until/base.py	2025-01-09 17:28:36.000000000 +0100
+@@ -101,8 +101,8 @@
+     ...         for channel, read in client.get_read_chunks():
+     ...             raw_data = numpy.frombuffer(read.raw_data, client.signal_dtype)
+     ...             # do something with raw data... and maybe call:
+-    ...             #    client.stop_receiving_read(channel, read.number)
+-    ...             #    client.unblock_read(channel, read.number)
++    ...             #    client.stop_receiving_read(channel, read.id)
++    ...             #    client.unblock_read(channel, read.id)
+     >>> with ThreadPoolExecutor() as executor:
+     ...     executor.submit(analysis_function, read_until_client)
+ 
+@@ -345,14 +345,14 @@
+             data = [
+                 (channel, read)
+                 for (channel, read) in data
+-                if read.number > self.channel_read_latest_decision[channel]
++                if read.id != self.channel_read_latest_decision[channel]
+             ]
+         return data
+ 
+     def unblock_read_batch(self, reads, duration=0.1):
+         """Request for a bunch of reads be unblocked.
+ 
+-        reads is expected to be a list of (channel, ReadData.number)
++        reads is expected to be a list of (channel, ReadData.id)
+ 
+         :param reads: List of (channel, read_number)
+         :type reads: list(tuple)
+@@ -377,7 +377,7 @@
+ 
+         :param read_channel: Channel number.
+         :type read_channel: int
+-        :param read_number: Read number, given by ``ReadData.number``
++        :param read_number: Read number, given by ``ReadData.id``
+         :type read_number: int
+         :param duration: time in seconds to apply unblock voltage.
+         :type duration: float
+@@ -389,7 +389,7 @@
+     def stop_receiving_batch(self, reads):
+         """Request for a bunch of reads to not receive anymore data.
+ 
+-        reads is expected to be a list of (channel, ReadData.number)
++        reads is expected to be a list of (channel, ReadData.id)
+ 
+         :param reads: List of (channel, read_number)
+         :type reads: list(tuple)
+@@ -413,7 +413,7 @@
+ 
+         :param read_channel: Channel number.
+         :type read_channel: int
+-        :param read_number: Read number, given by ``ReadData.number``
++        :param read_number: Read number, given by ``ReadData.id``
+         :type read_number: int
+ 
+         :returns: None
+@@ -567,10 +567,10 @@
+                         self.logger.debug(
+                             "Rereceived %s:%s after stop request.",
+                             read_channel,
+-                            read.number,
++                            read.id,
+                         )
+                         continue
+-                    self.stop_receiving_read(read_channel, read.number)
++                    self.stop_receiving_read(read_channel, read.id)
+                 unique_reads.add(read.id)
+                 read_samples_behind = progress.acquired - read.chunk_start_sample
+                 samples_behind += read_samples_behind
+diff --color -Nu read_until_api_v3.4.1/read_until/read_cache.py read_until_api_patched/read_until/read_cache.py
+--- read_until_api_v3.4.1/read_until/read_cache.py	2025-01-13 16:29:37.453641776 +0100
++++ read_until_api_patched/read_until/read_cache.py	2025-01-09 17:28:42.000000000 +0100
+@@ -70,7 +70,7 @@
+ 
+         :param key: Channel number for the read chunk
+         :type key: int
+-        :param value: Live read data object from MinKNOW rpc. Requires attribute ``number``
++        :param value: Live read data object from MinKNOW rpc. Requires attribute ``id``
+         :type value: minknow_api.data_pb2.GetLiveReadsResponse.ReadData
+ 
+         :returns: None
+@@ -78,7 +78,7 @@
+         with self.lock:
+             # Check if same read
+             if key in self._dict:
+-                if self._dict[key].number == value.number:
++                if self._dict[key].id == value.id:
+                     # Same read
+                     self.replaced += 1
+                 else:
+@@ -219,7 +219,7 @@
+                 self._dict[key] = value
+             else:
+                 # Key exists
+-                if self[key].number == value.number:
++                if self[key].id == value.id:
+                     # Same read, update raw_data
+                     self[key].raw_data += value.raw_data
+                     self.replaced += 1
