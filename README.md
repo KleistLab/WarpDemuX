@@ -1,9 +1,8 @@
 # WarpDemuX
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
-[![Preprint: BioRXiV](http://img.shields.io/badge/DOI-10.1101/2024.07.22.604276-blue.svg)](https://doi.org/10.1101/2024.07.22.604276)
-[![DOI:10.21203/rs.3.rs-4783223/v1](http://img.shields.io/badge/10.21203/rs.3.rs-4783223/v1-blue.svg)](https://doi.org/10.21203/rs.3.rs-4783223/v1)
-
+[![Preprint: BioRXiV](https://img.shields.io/badge/BioRXiV-doi:10.1101/2024.07.22.604276-blue)](https://doi.org/10.1101/2024.07.22.604276)
+[![Preprint: RSquare](https://img.shields.io/badge/Research_Square-doi:10.21203/rs.3.rs--4783223/v1-blue))](https://doi.org/10.21203/rs.3.rs-4783223/v1)
 
 WarpDemuX is an ultra-fast and high-accuracy adapter-barcoding and demultiplexing tool for Nanopore direct RNA sequencing. It enhances speed and accuracy through:
 
