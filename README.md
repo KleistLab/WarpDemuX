@@ -178,6 +178,8 @@ WarpDemuX features a flexible accuracy control system that lets you optimize the
 - 99.5%
 - 99.9%
 
+**Note:** For the WDX4b_tRNA_rna004_v0_4_6 model, target performance filtering is handled directly during prediction and cannot be changed at this time. Targeted performance is 99% precision.
+
 ### How It Works
 
 The confidence thresholds are determined through a barcode-specific calibration procedure:
@@ -253,6 +255,8 @@ The `predictions/` directory contains `barcode_predictions_[INDEX].csv` files, w
 | p-1 | Probability score for noise class |
 
 Note: Available probability columns (p01-p12) vary by model.
+
+**Note:** For the WDX4b_tRNA_rna004_v0_4_6 model there is no noise class. Predictions that are filtered out due to target performance are assigned a predicted barcode of `-1`.
 
 
 ### Failed Reads Output
