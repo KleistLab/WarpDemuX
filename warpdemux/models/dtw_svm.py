@@ -13,60 +13,15 @@ import numpy as np
 import pandas as pd
 from sklearn import svm
 
+from warpdemux.models.base import BaseDTWModel
 from warpdemux.parallel_distances import distance_matrix_to
 
 
 def pdist_kernel(pdist: np.ndarray, gamma: float = 1, pwr_dist: int = 1) -> np.ndarray:
-    return np.exp(-np.power(pdist, pwr_dist) / gamma)
+    return np.exp(-gamma * np.power(pdist, pwr_dist))
 
 
-def confidence_margin(npa: np.ndarray) -> np.ndarray:
-    sorted = np.sort(npa, axis=1)[:, ::-1]  # return sort in reverse, i.e. descending
-    d = sorted[:, 0] - sorted[:, 1]
-    return d
-
-
-class DTW_SVM_Model:
-    def __init__(
-        self,
-        C: float = 10.0,
-        gamma: float = 1.0,
-        pwr_dist: int = 1,
-        block_size: int = 1000,
-        window: int = 15,
-        penalty: float = 0.1,
-        noise_class: bool = True,
-    ):
-        self.C: float = C
-        self.gamma: float = gamma
-        self.model: Optional[svm.SVC] = None
-        self.pwr_dist: int = pwr_dist
-        self.block_size: int = block_size
-        self.window: int = window
-        self.penalty: float = penalty
-        self.noise_class: bool = noise_class
-
-        self.n_classes: Optional[int] = None
-        self.X_train: Optional[np.ndarray] = None
-
-        self.label_mapper: Optional[dict[int, int]] = None
-
-    @property
-    def is_trained(self):
-        return (
-            self.model is not None
-            and self.model.fit_status_ == 0
-            and self.X_train is not None
-        )
-
-    @property
-    def num_bcs(self):
-        if self.model is None:
-            msg = "Model not trained yet."
-            logging.error(msg)
-            raise ValueError(msg)
-
-        return self.model.classes_.size
+class DTW_SVM_Model(BaseDTWModel):
 
     def fit(
         self,
@@ -108,31 +63,6 @@ class DTW_SVM_Model:
         self.model.support_ = np.arange(self.model.support_.size, dtype=np.int32)
 
         self.X_train = X[support_indices]
-
-    # TODO: add confidence threshold with 0 class for unclassified reads
-    def prob_to_pred(self, y_prob: np.ndarray) -> np.ndarray:
-        if self.label_mapper is None:
-            msg = "Label mapper not set."
-            logging.error(msg)
-            raise ValueError(msg)
-
-        return np.array([self.label_mapper[i] for i in y_prob.argmax(axis=1)])
-
-    def predictions_to_df(self, y_pred: np.ndarray, y_prob: np.ndarray) -> pd.DataFrame:
-        if self.label_mapper is None:
-            msg = "Label mapper not set."
-            logging.error(msg)
-            raise ValueError(msg)
-        return pd.DataFrame(
-            {
-                "predicted_barcode": y_pred,  # -1 is the "no barcode (noise)" class
-                "confidence_score": confidence_margin(y_prob).round(3),
-                **{
-                    f"p{self.label_mapper[i]:02d}": y_prob[:, i].round(4)
-                    for i in range(y_prob.shape[1])
-                },
-            }
-        )
 
     @overload
     def predict(

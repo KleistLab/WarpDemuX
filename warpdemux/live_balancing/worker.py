@@ -16,7 +16,7 @@ from warpdemux.file_proc import load_model
 from warpdemux.live_balancing.balancer import BarcodeBalancers
 from warpdemux.live_balancing.config_parser import BalancingConfig, ModelConfig
 from warpdemux.live_balancing.utils import ReadObject, Result
-from warpdemux.models.dtw_svm import confidence_margin
+from warpdemux.models.utils import confidence_margin
 from warpdemux.read_until import ReadUntilClient
 from warpdemux.sig_proc import extract_adapter, normalize, segment_signal
 
