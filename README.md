@@ -281,8 +281,13 @@ The `failed_reads/` directory contains `failed_reads_[INDEX].csv` files with det
 - cnn_*: CNN method detection results
 - mvs_*: MVS method detection results
 
-**Quality Metrics:**
-- adapter_med_dt/mad_dt: Dwell time statistics. Median/median absolute deviation for the dwell time per translocation event in the adapter.
+**Segmentation Metrics:**
+- adapter_dt_med/mad: Dwell time statistics. Median/median absolute deviation for the dwell time per translocation event in the adapter.
+- adapter_event_mean/std/med/mad: Mean/standard deviation/median/median absolute deviation over the segmented adapter signal, which itself is the mean per detected translocation event.
+- seg_barcode_start: Position of the barcode start in the segmented adapter signal. Only available when consensus refined segmentation is used.
+- sig_barcode_start: Position of the barcode start in the original signal. Only available when consensus refined segmentation is used.
+
+**Failure Reasons:**
 - fail_reason: Specific cause of detection failure
 
 For a more detailed explanation of the failed reads output, please refer to the [ADAPTed documentation](https://github.com/KleistLab/ADAPTed/blob/main/README.md#output).

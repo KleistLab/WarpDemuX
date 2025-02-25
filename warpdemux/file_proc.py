@@ -24,6 +24,7 @@ from typing import Any, Callable, Dict, Generator, List, Set, Tuple, Union
 import joblib
 import numpy as np
 import pandas as pd
+from adapted.container_types import DetectResults
 from adapted.detect.cnn import load_cnn_model
 from adapted.detect.combined import (
     combined_detect_cnn,
@@ -34,11 +35,12 @@ from adapted.output import save_detected_boundaries
 from pod5.reader import Reader
 from tqdm import tqdm
 
+from warpdemux._consensus import ALL as CONSENSUS_ALL
 from warpdemux.config.config import Config
 from warpdemux.config.sig_proc import SigProcConfig
 from warpdemux.models import model_files
 from warpdemux.models.dtw_svm import DTW_SVM_Model
-from warpdemux.sig_proc import DetectResults, ReadResult, detect_results_to_fpt
+from warpdemux.sig_proc import ReadResult, detect_results_to_fpt
 
 _STOP_SIGNAL = threading.Event()
 
@@ -191,9 +193,31 @@ def barcode_fpt_wrapper(
 ) -> "ReadResult":
     """Note: signal should not contain nans"""
 
+    if spc.segmentation.consensus_refinement:
+        if spc.segmentation.consensus_model == "":
+            raise ValueError(
+                "consensus_model must be specified when consensus_refinement is True"
+            )
+        if spc.segmentation.consensus_model not in CONSENSUS_ALL:
+            raise ValueError(
+                f"Invalid consensus model: {spc.segmentation.consensus_model}"
+            )
+        consensus_divergence_index, consensus_signal = CONSENSUS_ALL[
+            spc.segmentation.consensus_model
+        ]
+    else:
+        consensus_signal = np.array([])
+        consensus_divergence_index = 0
+
     try:
         # partial ReadResult, missing read_id
-        proc_res = detect_results_to_fpt(signal, spc, detect_results)
+        proc_res = detect_results_to_fpt(
+            signal,
+            spc,
+            detect_results,
+            consensus_signal,
+            consensus_divergence_index,
+        )
         proc_res.set_read_id(read_id)
         return proc_res
 
