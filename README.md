@@ -37,6 +37,21 @@ pip install -e '.[live-demux]'
 
 ```
 
+### Using a different branch
+
+After switching to a different branch, you need to update the submodules.
+
+For example, to switch to the `dev-tRNA` branch:
+```{bash}
+git switch dev-tRNA && git submodule update
+```
+
+To switch back to the `main` branch:
+```{bash}
+git switch main && git submodule update
+```
+
+### Non-editable mode
 WarpDemuX depends on ADAPTed, our tool for adapter and poly(A) tail detection. ADAPTed is included as a submodule for now. To make sure WDX can access this module correctly, you need to install WDX in editable mode. See above.
 
 If you don't wish to install in editable mode, you can install the warpdemux and adapted packages separately:
@@ -48,6 +63,8 @@ pip install .
 cd warpdemux/adapted
 pip install .
 ```
+
+If you decide for this approach, you need to reinstall both packages whenever you switch branches.
 
 ## Basic Usage
 
