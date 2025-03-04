@@ -14,6 +14,7 @@ import numpy as np
 from adapted.container_types import DetectResults
 from adapted.container_types import ReadResult as AdaptedReadResult
 from dtaidistance.dtw import warping_path_fast
+from ruptures import KernelCPD
 from scipy.signal import find_peaks
 
 from warpdemux.config.sig_proc import SigProcConfig
@@ -279,6 +280,7 @@ def segment_signal_with_consensus_guided_barcode_refinement(
     min_obs_per_base: int = 15,
     running_stat_width: int = 30,
     normalize_wrt_method: str = "mean",
+    use_optimal_cpts: bool = False,
     return_adapter_segmentation_results: bool = False,
 ) -> Tuple[np_ndarray, np_ndarray, int, int]: ...
 
@@ -293,6 +295,7 @@ def segment_signal_with_consensus_guided_barcode_refinement(
     min_obs_per_base: int = 15,
     running_stat_width: int = 30,
     normalize_wrt_method: str = "mean",
+    use_optimal_cpts: bool = False,
     return_adapter_segmentation_results: bool = True,
 ) -> Tuple[np_ndarray, np_ndarray, np_ndarray, np_ndarray, int, int]: ...
 
@@ -306,6 +309,7 @@ def segment_signal_with_consensus_guided_barcode_refinement(
     min_obs_per_base: int = 15,
     running_stat_width: int = 30,
     normalize_wrt_method: str = "mean",
+    use_optimal_cpts: bool = False,
     return_adapter_segmentation_results: bool = False,
 ) -> Union[
     Tuple[np_ndarray, np_ndarray, int, int],
@@ -314,41 +318,41 @@ def segment_signal_with_consensus_guided_barcode_refinement(
     """
     Segment the given raw signal using the `c_windowed_t_test` function.
 
-    If segmentation is not possible (e.g. because there is too little signal for the desired number of events under
-    the running_stat_width and/or min_obs_per_base), an empty array is returned.
-
-    Parameters:
+    Parameters
     ----------
     raw_signal : np.ndarray
         The raw signal array to be segmented.
-
     consensus_signal : np.ndarray
         The consensus signal array to be used for determining the barcode start position in the segmented signal.
         Multiple consensus signals can be provided by passing a 2D array with shape (n_signals, signal_length).
         In this case, majority voting across the consensus signals is used to determine the barcode start position.
-
     consensus_divergence_index : int, optional
-        The divergence index for the consensus signal.
-
+        The divergence index for the consensus signal. Default is 83.
     num_events_signal : int, optional
-        The desired number of events in the signal.
-
+        The desired number of events in the signal. Default is 110.
     num_events_barcode : int, optional
-        The desired number of events in the barcode.
-
+        The desired number of events in the barcode. Default is 25.
     min_obs_per_base : int, optional
-        Minimum observations per base.
-
+        Minimum observations per base. Default is 15.
     running_stat_width : int, optional
-        Width for the running statistic used for segmentation.
+        Width for the running statistic used for segmentation. Default is 30.
+    normalize_wrt_method : str, optional
+        The method to normalize the refined segment signal with respect to the full segment signal. Default is "mean".
+    use_optimal_cpts : bool, optional
+        Whether to use the optimal cpts for the barcode segmentation. This is slow. Default is False.
+    return_adapter_segmentation_results : bool, optional
+        Whether to return the adapter segmentation results. Default is False.
 
-    accept_less_cpts : bool, optional
-        Whether to accept less cpts than num_events_signal.
-
-    Returns:
+    Returns
     -------
-    np.ndarray
-        Array containing normalized, consensus-guided barcode-refined, segmented signal values (mean value per event).
+    Union[Tuple[np.ndarray, np.ndarray, int, int], Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int]]
+        If return_adapter_segmentation_results is False:
+            - Normalized, consensus-guided barcode-refined, segmented signal values (mean value per event)
+            - Dwell times
+            - Segment barcode start index
+            - Signal barcode start index
+        If return_adapter_segmentation_results is True:
+            - Same as above plus adapter segmentation means and dwell times
     """
 
     def _get_barcode_start(
@@ -398,13 +402,21 @@ def segment_signal_with_consensus_guided_barcode_refinement(
 
     barcode_scores = adapter_scores[sig_barcode_start:]
 
-    valid_cpts = discrepenacy_curve_to_cpts(
-        barcode_scores,
-        num_events=num_events_barcode,
-        min_obs_per_base=min_obs_per_base,
-        running_stat_width=running_stat_width,
-        accept_less_cpts=False,
-    )
+    if use_optimal_cpts:
+        algo = KernelCPD(kernel="linear", min_size=min_obs_per_base)
+        algo.fit(barcode_scores.reshape(-1, 1))
+        valid_cpts = np.array(
+            algo.predict(n_bkps=num_events_barcode)
+        )  # size num_events_barcode+1, includes signal length
+        valid_cpts = np.insert(valid_cpts, 0, 0)
+    else:
+        valid_cpts = discrepenacy_curve_to_cpts(
+            barcode_scores,
+            num_events=num_events_barcode,
+            min_obs_per_base=min_obs_per_base,
+            running_stat_width=running_stat_width,
+            accept_less_cpts=False,
+        )
 
     barcode_dwell_times = valid_cpts[1:] - valid_cpts[:-1]
     barcode_event_means = compute_base_means(raw_signal[sig_barcode_start:], valid_cpts)
@@ -531,6 +543,7 @@ def detect_results_to_fpt(
             ),
             normalize_wrt_method=spc.segmentation.normalization,
             return_adapter_segmentation_results=True,
+            use_optimal_cpts=spc.segmentation.refinement_optimal_cpts,
         )
         if not norm_segment_avgs.size:
             return ReadResult(

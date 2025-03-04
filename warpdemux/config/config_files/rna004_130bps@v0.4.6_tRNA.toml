@@ -19,6 +19,7 @@ barcode_num_events = [29, 23]
 accept_less_cpts = false
 consensus_refinement = true
 consensus_model = "rna004_130bps_v0_4_6_tRNA"
+refinement_optimal_cpts = false
 
 [cnn_boundaries]
 cnn_detect = false

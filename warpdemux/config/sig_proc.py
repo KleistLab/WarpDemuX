@@ -33,6 +33,14 @@ class SegmentationConfig(AdaptedBaseConfig):
         Number of events to detect.
     accept_less_cpts: bool
         Whether to accept less cpts than num_events.
+
+    consensus_refinement: bool
+        Whether to use consensus barcode refinement.
+    consensus_model: str
+        The consensus model to use. See warpdemux.config._consensus
+    refinement_optimal_cpts: bool
+        Whether to use the optimal segmentation for the barcode segmentation.
+
     normalization: str
         Normalization method. Can be "none", "mean", or "median".
     barcode_num_events: Union[int, Tuple[int, int]]
@@ -48,6 +56,8 @@ class SegmentationConfig(AdaptedBaseConfig):
 
     consensus_refinement: bool = False
     consensus_model: str = ""
+
+    refinement_optimal_cpts: bool = False
 
     normalization: str = "none"
     barcode_num_events: Union[int, Tuple[int, int]] = 25
