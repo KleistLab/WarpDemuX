@@ -19,29 +19,6 @@ from warpdemux.parallel_distances import distance_matrix_to
 
 class DTW_MLP(BaseDTWModel):
 
-    def __init__(
-        self,
-        block_size: int = 1000,
-        window: int = 15,
-        penalty: float = 0.1,
-        cal_dict: Dict[str, np.ndarray] = {
-            "98": np.array([0.98, 0.98, 0.98, 0.98]),
-            "99": np.array([0.99, 0.99, 0.99, 0.99]),
-        },
-        noise_class: bool = False,
-    ):
-        self.block_size: int = block_size
-        self.window: int = window
-        self.penalty: float = penalty
-
-        self.noise_class: bool = noise_class
-
-        self.model: Optional[Pipeline] = None
-        self.cal_dict: Dict[str, np.ndarray] = cal_dict
-        self.n_classes: Optional[int] = None
-        self._X: Optional[np.ndarray] = None
-        self.label_mapper: Optional[Dict[int, int]] = None
-
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
         pass
 

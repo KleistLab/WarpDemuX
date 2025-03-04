@@ -22,6 +22,11 @@ def pdist_kernel(pdist: np.ndarray, gamma: float = 1, pwr_dist: int = 1) -> np.n
 
 
 class DTW_SVM_Model(BaseDTWModel):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.gamma: float = kwargs.get("gamma", 1)
+        self.pwr_dist: int = kwargs.get("pwr_dist", 1)
+        self.C: float = kwargs.get("C", 1)
 
     def fit(
         self,
@@ -62,7 +67,7 @@ class DTW_SVM_Model(BaseDTWModel):
         self.model.shape_fit_ = (self.model.support_.size, self.model.support_.size)
         self.model.support_ = np.arange(self.model.support_.size, dtype=np.int32)
 
-        self.X_train = X[support_indices]
+        self._X = X[support_indices]
 
     @overload
     def predict(
@@ -102,21 +107,21 @@ class DTW_SVM_Model(BaseDTWModel):
             logging.error(msg)
             raise ValueError(msg)
 
-        assert self.X_train is not None  # This informs the type checker
+        assert self._X is not None  # This informs the type checker
         assert self.model is not None  # This informs the type checker
 
         if X.ndim == 1:
             X = X.reshape(1, -1)
 
-        if X.shape[1] != self.X_train.shape[1]:
+        if X.shape[1] != self._X.shape[1]:
             raise ValueError(
                 "X must have the same number of columns as the training data "
-                f" ({self.X_train.shape[1]})."
+                f" ({self._X.shape[1]})."
             )
 
         dtw_pdist = distance_matrix_to(
             X,
-            self.X_train,
+            self._X,
             window=self.window,
             penalty=self.penalty,
             block_size=self.block_size if block_size is None else block_size,

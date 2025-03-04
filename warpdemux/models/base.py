@@ -6,16 +6,23 @@ import numpy as np
 import pandas as pd
 from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
+
 from warpdemux.models.utils import confidence_margin
 
 
 class BaseDTWModel(ABC):
-    model: Optional[Union[Pipeline, SVC]] = None
-    n_classes: Optional[int] = None
-    _X: Optional[np.ndarray] = None
-    label_mapper: Optional[Dict[int, int]] = None
-    cal_dict: Optional[Dict[str, np.ndarray]] = None
-    noise_class: bool = False
+    def __init__(self, **kwargs):
+        self.block_size: int = kwargs.get("block_size", 1000)
+        self.window: int = kwargs.get("window", 15)
+        self.penalty: float = kwargs.get("penalty", 0.1)
+
+        self.model: Optional[Union[Pipeline, SVC]] = kwargs.get("model", None)
+        self.n_classes: Optional[int] = kwargs.get("n_classes", None)
+        self._X: Optional[np.ndarray] = kwargs.get("_X", None)
+        self.label_mapper: Optional[Dict[int, int]] = kwargs.get("label_mapper", None)
+        self.noise_class: bool = kwargs.get("noise_class", False)
+
+        self.cal_dict: Optional[Dict[str, np.ndarray]] = kwargs.get("cal_dict", None)
 
     @property
     def is_trained(self):
