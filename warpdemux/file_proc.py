@@ -202,12 +202,9 @@ def barcode_fpt_wrapper(
             raise ValueError(
                 f"Invalid consensus model: {spc.segmentation.consensus_model}"
             )
-        consensus_divergence_index, consensus_signal = CONSENSUS_ALL[
-            spc.segmentation.consensus_model
-        ]
+        consensus_query = CONSENSUS_ALL[spc.segmentation.consensus_model]
     else:
-        consensus_signal = np.array([])
-        consensus_divergence_index = 0
+        consensus_query = np.array([])
 
     try:
         # partial ReadResult, missing read_id
@@ -215,8 +212,7 @@ def barcode_fpt_wrapper(
             signal,
             spc,
             detect_results,
-            consensus_signal,
-            consensus_divergence_index,
+            consensus_query,
         )
         proc_res.set_read_id(read_id)
         return proc_res

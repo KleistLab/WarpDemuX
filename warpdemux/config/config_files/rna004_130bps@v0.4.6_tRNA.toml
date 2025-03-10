@@ -17,8 +17,15 @@ num_events = 120
 normalization = "mean"
 barcode_num_events = [29, 23]
 accept_less_cpts = false
+
 consensus_refinement = true
 consensus_model = "rna004_130bps_v0_4_6_tRNA"
+consensus_subseq_match_normalization = "mean"
+consensus_subseq_match_penalty = 1.5
+consensus_subseq_match_psi = [5, 0, 40, 0]
+consensus_subseq_match_ub_start = 18
+consensus_subseq_match_lb_end = 69
+consensus_subseq_match_ub_end = 97
 refinement_optimal_cpts = false
 
 [cnn_boundaries]

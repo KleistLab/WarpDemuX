@@ -57,6 +57,13 @@ class SegmentationConfig(AdaptedBaseConfig):
     consensus_refinement: bool = False
     consensus_model: str = ""
 
+    consensus_subseq_match_normalization: str = "mean"
+    consensus_subseq_match_penalty: float = 1.5
+    consensus_subseq_match_psi: Tuple[float, float, float, float] = (5, 0, 40, 0)
+    consensus_subseq_match_ub_start: int = 18
+    consensus_subseq_match_lb_end: int = 69
+    consensus_subseq_match_ub_end: int = 97
+
     refinement_optimal_cpts: bool = False
 
     normalization: str = "none"

@@ -261,41 +261,50 @@ def parse_export_string(export_str):
         for section, params in toml_data.items():
             for attr, value in params.items():
                 export_vals[(section, attr)] = value
-
         return export_vals
-    else:
-        export_vals = {}
-        try:
-            for pair in export_str.split(","):
-                if "=" not in pair:
-                    raise ValueError(f"Missing '=' in parameter pair: {pair}")
 
-                key, value = pair.split("=", maxsplit=1)
-                key = key.strip()
-                if "." not in key:
-                    raise ValueError(f"Missing '.' in parameter key: {key}")
+    import shlex
 
-                section, attr = key.split(".", maxsplit=1)
-                if not section or not attr:
-                    raise ValueError(f"Empty variable or attribute in key: {key}")
+    export_vals = {}
+    try:
+        # Use shlex to properly handle nested structures and quotes
+        pairs = shlex.split(export_str, posix=True)
+        for pair in pairs:
+            if "=" not in pair:
+                raise ValueError(f"Missing '=' in parameter pair: {pair}")
 
-                # interpret value as bool, float or int if possible
-                try:
-                    # Handle boolean strings case-insensitively
-                    if value.strip().lower() in ("true", "false"):
-                        value = value.strip().lower() == "true"
-                    else:
-                        value = ast.literal_eval(value)
-                except (ValueError, SyntaxError):
-                    value = value.strip()
+            key, value = pair.split("=", maxsplit=1)
+            key = key.strip()
+            if "." not in key:
+                raise ValueError(f"Missing '.' in parameter key: {key}")
 
-                export_vals[(section.strip(), attr.strip())] = value
-            return export_vals
-        except ValueError as e:
-            raise argparse.ArgumentTypeError(
-                f"Invalid export string format: {str(e)}. "
-                "Must be in format 'section.attr=value1,section.attr2=value2'"
-            )
+            section, attr = key.split(".", maxsplit=1)
+            if not section or not attr:
+                raise ValueError(f"Empty variable or attribute in key: {key}")
+
+            # Parse the value
+            try:
+                value = value.strip()
+                # Handle boolean strings case-insensitively
+                if value.lower() in ("true", "false"):
+                    value = value.lower() == "true"
+                else:
+                    value = ast.literal_eval(value)
+            except (ValueError, SyntaxError):
+                value = value.strip()
+
+            export_vals[(section.strip(), attr.strip())] = value
+        return export_vals
+
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(
+            f"Invalid export string format: {str(e)}. "
+            "Examples:\n"
+            "  section.attr=value1 section.attr2=value2\n"
+            "  section.attr='string with spaces'\n"
+            "  section.attr=(1,2,3)\n"
+            '  section.attr="complex string, with comma"'
+        )
 
 
 def backup_file(file_path: str):
