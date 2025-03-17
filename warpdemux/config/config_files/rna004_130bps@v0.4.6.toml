@@ -1,0 +1,30 @@
+[core]
+max_obs_trace = 10000
+
+[sig_extract]
+padding = 100
+normalization = "none"
+
+[segmentation]
+min_obs_per_base = 6
+running_stat_width = 12
+num_events = 110
+normalization = "mean"
+barcode_num_events = 25
+accept_less_cpts = false
+
+[mvs_polya]
+mvs_detect_check = true
+
+[cnn_boundaries]
+cnn_detect = true
+polya_cand_k = 5
+
+[llr_boundaries]
+llr_detect = false
+
+[med_shift]
+detect_med_shift = false
+
+[rna_start_peak]
+detect_rna_start_peak = false

@@ -82,3 +82,10 @@ SQK = "RNA004"
 WDX_version = "0.4.6"
 spc = "rna004_130bps@v0.4.6"
 which_barcodes = [4, 5, 6, 11]
+
+[WDX4b_rna004_v0_4_6]
+num_bcs = 4
+SQK = "RNA004"
+WDX_version = "0.4.6"
+spc = "rna004_130bps@v0.4.6"
+which_barcodes = [4, 5, 7, 11]
