@@ -332,10 +332,15 @@ def segment_signal_with_consensus_guided_barcode_refinement(
     barcode_scores = adapter_scores[sig_barcode_start:]
 
     # if tuple, first entry is segmentation num_events, second is num_events to keep
-    if isinstance(config.barcode_num_events, tuple):
-        barcode_segm_num_events = config.barcode_num_events[0]
+    if hasattr(config.barcode_num_events, '__len__'):
+        if not isinstance(config.barcode_num_events, (tuple, list, np.ndarray)):
+            msg = "barcode_num_events must be a tuple, list or numpy array when using multiple values"
+            logging.error(msg)
+            raise TypeError(msg)
+        barcode_segm_num_events = int(config.barcode_num_events[0])
     else:
-        barcode_segm_num_events = config.barcode_num_events
+        assert isinstance(config.barcode_num_events, int)
+        barcode_segm_num_events = int(config.barcode_num_events)
 
     # logging.info(f"seg_query_end: {seg_query_end}")
 
