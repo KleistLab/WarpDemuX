@@ -18,7 +18,7 @@ from warpdemux.logger import setup_logger
 from warpdemux.parser import parse_args
 
 
-def main(args=None) -> Dict[str, Any]:
+def _main(args=None) -> Dict[str, Any]:
 
     config = parse_args()
     setup_logger(os.path.join(config.output.output_dir, "warpdemux.log"))
@@ -89,6 +89,10 @@ def main(args=None) -> Dict[str, Any]:
 
     return ridx_dict
 
+def main():
+    ridx_dict = _main()
+    logging.info(f"Results: {ridx_dict}")
+    return 0
 
 if __name__ == "__main__":
     main()
