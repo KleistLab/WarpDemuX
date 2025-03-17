@@ -1,0 +1,83 @@
+[core]
+max_obs_trace = 10000
+min_obs_adapter = 2000
+max_obs_adapter = 6000
+min_obs_polya = 100
+downscale_factor = 10
+sig_norm_outlier_thresh = 5.0
+
+[sig_extract]
+padding = 100
+normalization = "none"
+
+[segmentation]
+min_obs_per_base = 9
+running_stat_width = 18
+num_events = 120
+normalization = "mean"
+barcode_num_events = [25, 25]
+accept_less_cpts = false
+
+consensus_refinement = true
+consensus_model = "rna004_130bps_v0_4_6_tRNA"
+consensus_subseq_match_normalization = "mean"
+consensus_subseq_match_penalty = 1.5
+consensus_subseq_match_psi = [5, 0, 40, 0]
+consensus_subseq_match_ub_start = 18
+consensus_subseq_match_lb_end = 69
+consensus_subseq_match_ub_end = 97
+refinement_optimal_cpts = false
+
+[cnn_boundaries]
+cnn_detect = false
+
+[llr_boundaries]
+llr_detect = false
+
+[mvs_polya]
+mvs_detect_check = false
+mvs_detect_overwrite = false
+
+search_window = 500
+pA_mean_window = 20
+pA_var_window = 50
+pA_var_range = [-inf, 30.0]
+median_shift_range = [5.0, inf]
+median_shift_window = 1000
+polyA_med_range = [-inf, inf]
+polyA_local_range = [-inf, inf]
+pA_mean_adapter_med_scale_range = [1.3, inf]
+
+[real_range]
+detect_open_pores = false
+real_signal_check = true
+mean_window = 300
+mean_start_range = [-inf, inf]
+mean_end_range = [-inf, inf]
+max_obs_local_range = 5000
+local_range = [7.0, 35.0]
+adapter_mad_range = [3.0, 12.0]
+
+[med_shift]
+detect_med_shift = true
+med_shift_window = 10000
+med_shift_range = [5.0, inf]
+
+[rna_start_peak]
+detect_rna_start_peak = true
+downscale_factor = 10
+start_peak_max_idx = 150
+offset1 = 10
+offset2 = 100
+open_pore_pa = 195.0
+min_start_peak_pa = 83
+
+adapter_med_polya_mean_scale = 1.3
+min_len_polya = 10
+
+detect_polya = true
+detect_polya_min_len = 10
+detect_polya_max_len = 80
+detect_polya_std_scale = 3
+
+fallback_to_llr = false
