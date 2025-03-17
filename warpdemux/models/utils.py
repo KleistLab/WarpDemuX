@@ -1,6 +1,8 @@
 import importlib.resources as pkg_resources
+from typing import Optional, Tuple
 
 import numpy as np
+import pandas as pd
 import toml
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_sample_weight
@@ -30,3 +32,30 @@ class WeightedStandardScaler(StandardScaler):
             np.average((X - self.mean_) ** 2, axis=0, weights=sample_weights)
         )
         return self
+
+def predictions_to_df(y_pred: np.ndarray, y_prob: np.ndarray, conf: np.ndarray, label_mapper: dict) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "predicted_barcode": y_pred,
+            "confidence_score": conf.round(3),
+            **{f"p{label_mapper[i]:02d}": y_prob[:, i].round(4) for i in range(y_prob.shape[1])},
+        }
+    )
+
+def process_probs(y_prob: np.ndarray, label_mapper: dict, thresholds: Optional[np.ndarray] = None) -> Tuple[np.ndarray, np.ndarray]:
+    """Process probabilities to predictions and confidence scores.
+
+    Args:
+        y_prob: Probabilities of each class
+        label_mapper: Label mapper
+        thresholds: Thresholds for each class, confidence scores below these are filtered out
+    """
+    pred_idx = np.argmax(y_prob, axis=1)
+    pred = np.array([label_mapper[i] for i in pred_idx])
+    
+    conf = confidence_margin(y_prob)
+    
+    if thresholds is not None:
+        mask = conf < thresholds[pred_idx]
+        pred[mask] = -1
+    return pred, conf

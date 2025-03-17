@@ -36,7 +36,9 @@ from warpdemux._consensus import ALL as CONSENSUS_ALL
 from warpdemux.config.config import Config
 from warpdemux.config.sig_proc import SigProcConfig
 from warpdemux.models import model_files
-from warpdemux.models.dtw_svm import DTW_SVM_Model
+from warpdemux.models.dtw_mlp import DTW_MLP
+from warpdemux.models.dtw_svm import DTW_SVM
+from warpdemux.models.fpt_boost import Fpt_Boost
 from warpdemux.sig_proc import ReadResult, detect_results_to_fpt
 
 _STOP_SIGNAL = threading.Event()
@@ -999,7 +1001,7 @@ def set_total_num_reads_npz(
 
 
 # TODO: move models
-def load_model(model_name: str) -> DTW_SVM_Model:
+def load_model(model_name: str) -> Union[DTW_SVM, DTW_MLP, Fpt_Boost]:
     with pkg_resources.path(model_files, f"{model_name}.joblib") as model_path:
         return joblib.load(model_path)
 

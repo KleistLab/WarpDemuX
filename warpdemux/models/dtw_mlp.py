@@ -7,26 +7,22 @@ Contact: w.vandertoorn@fu-berlin.de
 """
 
 import logging
-from typing import Dict, Literal, Optional, Tuple, Union, overload
+from typing import Literal, Optional, Tuple, Union, overload
 
 import numpy as np
 import pandas as pd
-from sklearn.pipeline import Pipeline
 
-from warpdemux.models.base import BaseDTWModel
+from warpdemux.models.dtw_base import BaseDTWModel
+from warpdemux.models.utils import predictions_to_df
 from warpdemux.parallel_distances import distance_matrix_to
 
 
 class DTW_MLP(BaseDTWModel):
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
-        pass
-
     @overload
     def predict(
         self,
         X: np.ndarray,
-        tam: str = "99",
         nproc: int = -1,
         block_size: Optional[int] = None,
         pbar: bool = False,
@@ -38,7 +34,6 @@ class DTW_MLP(BaseDTWModel):
     def predict(
         self,
         X: np.ndarray,
-        tam: str = "99",
         nproc: int = -1,
         block_size: Optional[int] = None,
         pbar: bool = False,
@@ -49,7 +44,6 @@ class DTW_MLP(BaseDTWModel):
     def predict(
         self,
         X: np.ndarray,
-        tam: str = "99",
         nproc: int = -1,
         block_size: Optional[int] = None,
         pbar: bool = False,
@@ -58,7 +52,6 @@ class DTW_MLP(BaseDTWModel):
     ) -> Union[Tuple[np.ndarray, np.ndarray], pd.DataFrame]:
         """set nproc to 1 to disable parallelization, nproc=None to use all available cores
 
-        tam: str = "99" -> 99% Target Accuracy Mode
         """
 
         if not self.is_trained:
@@ -90,9 +83,18 @@ class DTW_MLP(BaseDTWModel):
         )
 
         y_prob = self.model.predict_proba(D)
-        y_pred = self.prob_to_pred(y_prob, tam=tam)
+        y_pred, conf = self.process_probs(y_prob)
 
         if return_df:
-            return self.predictions_to_df(y_pred, y_prob)
+            if self.label_mapper is None:
+                raise ValueError("Label mapper is not set.")
+            return predictions_to_df(y_pred, y_prob, conf, self.label_mapper)
 
         return y_pred, y_prob
+
+    def num_bcs(self) -> int:
+        if self.n_classes is not None:
+            return self.n_classes
+        if self.label_mapper is not None:
+            return len(self.label_mapper) - self.noise_class
+        raise ValueError("No number of barcodes available.")
