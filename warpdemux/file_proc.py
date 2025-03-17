@@ -26,11 +26,8 @@ import numpy as np
 import pandas as pd
 from adapted.container_types import DetectResults
 from adapted.detect.cnn import load_cnn_model
-from adapted.detect.combined import (
-    combined_detect_cnn,
-    combined_detect_llr2,
-    combined_detect_start_peak,
-)
+from adapted.detect.combined import (combined_detect_cnn, combined_detect_llr2,
+                                     combined_detect_start_peak)
 from adapted.output import save_detected_boundaries
 from pod5.reader import Reader
 from tqdm import tqdm

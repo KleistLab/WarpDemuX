@@ -19,7 +19,8 @@ from ruptures import KernelCPD
 from scipy.signal import find_peaks
 
 from warpdemux.config.sig_proc import SegmentationConfig, SigProcConfig
-from warpdemux.segmentation.segmentation import compute_base_means, windowed_t_test
+from warpdemux.segmentation.segmentation import (compute_base_means,
+                                                 windowed_t_test)
 
 
 @dataclass
