@@ -359,6 +359,9 @@ def segment_signal_with_consensus_guided_barcode_refinement(
             running_stat_width=config.running_stat_width,
             accept_less_cpts=False,
         )
+    
+    if valid_cpts.size == 0:
+        return np.array([]), np.array([]), np.array([]), np.array([]), 0, 0, 0
 
     barcode_dwell_times = valid_cpts[1:] - valid_cpts[:-1]
     barcode_event_means = compute_base_means(raw_signal[sig_barcode_start:], valid_cpts)
