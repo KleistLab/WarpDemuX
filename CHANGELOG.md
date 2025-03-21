@@ -1,4 +1,4 @@
-## Unreleased
+## [v0.4.7] - 2025-03-21
 
 ### Changed
 
@@ -6,10 +6,17 @@
 - command line argument `--model_name`/`-m` is now required for the `demux` and `prep` subcommands.
 - The progress bar now updates every second, rather than every 10 seconds.
 - You can now change certain parameters at the command line when running `continue`. Available parameters are: `num_proc`, `batch_size_output`, `minibatch_size` and `model_name`. The same holds for the `predict` subcommand, see below.
+- Refactor of DTW_SVM model.
 
 ### Added
 
 - The `predict` subcommand has been added. It can be used to predict barcodes for previously preprocessed reads (subcommand `prep`).
+- **WarpDemuX-tRNA**: support for nanopore tRNA sequencing with the Nano-tRNAseq protocol (models WDX4b_tRNA_rna004_v0_4_7).
+- WDX4b_rna004_v0_4_6 and WDX4c_rna004_v0_4_6: 4-barcode models for RNA004 using different barcode sets.
+- Automatic target performance filtering (99% precision) is available for the following models: WDX4_rna004_v0_4_4, WDX4c_rna004_v0_4_6, WDX4b_tRNA_rna004_v0_4_7. For these models, predictions below the target confidence threshold are automatically predicted as -1 (unclassified).
+- New dependencies: `catboost` and `ruptures`.
+- Consensus-based barcode position identification and focused barcode-resegmentation.  
+
 
 ### Removed
 
