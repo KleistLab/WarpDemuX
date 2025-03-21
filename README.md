@@ -41,9 +41,9 @@ pip install -e '.[live-demux]'
 
 After switching to a different branch, you need to update the submodules.
 
-For example, to switch to the `dev-tRNA` branch:
+For example, to switch to the `dev` branch:
 ```{bash}
-git switch dev-tRNA && git submodule update
+git switch dev && git submodule update
 ```
 
 To switch back to the `main` branch:
@@ -125,7 +125,7 @@ The CNN adapter detection method used for RNA004 has limitations when processing
 By default, WarpDemuX enables automatic fallback to the more sensitive LLR method for short reads
 However, this can significantly increase runtime if your data contains many adapter-only reads. You can disable this behavior by setting the `--export cnn_boundaries.fallback_to_llr_short_reads=false` runtime argument
   
-Alternatively, you can take a look at one of the other detection methods available. For example, the `rna_start_peak` method is more sensitive to short reads. `rna_start_peak` does currently not support poly(A) tail detection or validation of the detected boundaries.
+Alternatively, you can take a look at one of the other detection methods available. For example, the `rna_start_peak` method is more sensitive to short reads. 
 
 ### Fallback detection to LLR
 
@@ -162,85 +162,62 @@ For detailed information about barcode design, optimization, and performance cha
 
 WarpDemuX RNA004 models are optimized for reads with poly(A) tails. For datasets with many short poly(A) tails, you have two options:
 
-1. Enable LLR fallback with `--export cnn_boundaries.fallback_to_llr_short_reads=true`
+1. Enable LLR fallback, see [Advanced Usage](#advanced-usage).
 2. Switch to LLR detection entirely (slower but better handles short poly(A) tails)
 
 Note: CNN detection is only available for RNA004, while LLR detection is the standard method for RNA002.
 
-| Model Name | Chemistry | Samples | Barcodes Used |
-|------------|-----------|----------|---------------|
-| WDX-DPC_rna002_v0_4_4 | RNA002 | 4 | Original DeePlexiCon barcodes |
-| WDX4_rna002_v0_4_4 | RNA002 | 4 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc08 |
-| WDX6_rna002_v0_4_4 | RNA002 | 6 | WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc11 |
-| WDX8_rna002_v0_4_4 | RNA002 | 8 | WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc11, WDX_bc12 |
-| WDX10_rna002_v0_4_4 | RNA002 | 10 | WDX_bc01, WDX_bc02, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc10, WDX_bc11, WDX_bc12 |
-| WDX12_rna002_v0_4_4 | RNA002 | 12 | All 12 WDX barcodes |
-| WDX4_rna004_v0_4_4 | RNA004 | 4 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc07 |
+| Model Name | Chemistry | Library Type | # Samples | Barcodes Used |
+|------------|-----------|--------------|-----------|---------------|
+| WDX-DPC_rna002_v0_4_4 | RNA002 | polyA RNA | 4 | Original DeePlexiCon barcodes |
+| WDX4_rna002_v0_4_4 | RNA002 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc08 |
+| WDX6_rna002_v0_4_4 | RNA002 | polyA RNA | 6 | WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc11 |
+| WDX8_rna002_v0_4_4 | RNA002 | polyA RNA | 8 | WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc11, WDX_bc12 |
+| WDX10_rna002_v0_4_4 | RNA002 | polyA RNA | 10 | WDX_bc01, WDX_bc02, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc10, WDX_bc11, WDX_bc12 |
+| WDX12_rna002_v0_4_4 | RNA002 | polyA RNA | 12 | All 12 WDX barcodes |
+| WDX4_rna004_v0_4_4 | RNA004 | polyA RNA | 4 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc07 |
+| WDX4b_rna004_v0_4_6 | RNA004 | polyA RNA | 4 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc07 |
+| WDX4c_rna004_v0_4_6 | RNA004 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc11 |
+| WDX4b_tRNA_rna004_v0_4_7 (**WarpDemuX-tRNA**) | RNA004 | tRNA (Nano-tRNAseq) | 4 | WDX_bc04, WDX_bc05, WDX_bc07, WDX_bc11 |
+
 
 **Coming soon:**
-- RNA004 tRNA models
-- RNA004 non-polyA models
-- RNA004 larger barcode sets
+- RNA004 tRNA models with larger barcode sets
 
-## Target Accuracy Modes
+## Target Performance Modes
 
+WarpDemuX features a flexible performance control system that lets you optimize the balance between prediction accuracy/precision and data yield. By using barcode-specific calibrated confidence thresholds, you can target a specific performance level for each barcode.
 
-WarpDemuX features a flexible accuracy control system that lets you optimize the balance between prediction accuracy and data yield. Each model includes barcode-specific calibrated thresholds that account for unique characteristics and error patterns.
+Automatic target performance filtering (99% precision) is available for the following models:
 
-### Available Target Accuracies
+- WDX4_rna004_v0_4_4
+- WDX4c_rna004_v0_4_6
+- WDX4b_tRNA_rna004_v0_4_7
 
-- 95.0%
-- 97.5%
-- 99.0%
-- 99.5%
-- 99.9%
+For these models, predictions below the target confidence threshold are automatically predicted as -1 (unclassified).
 
-**Note:** For the WDX4b_tRNA_rna004_v0_4_6 model, target performance filtering is handled directly during prediction and cannot be changed at this time. Targeted performance is 99% precision.
-
-### How It Works
-
-The confidence thresholds are determined through a barcode-specific calibration procedure:
-
-
-1. Baseline error rates are established for each barcode using calibration datasets
-2. Model- and barcode-specific confidence thresholds are computed for each target accuracy level
-3. Predictions are filtered using these thresholds to maintain accuracy targets
-
-### Using Target Accuracy Modes
-
-Currently, you can apply target accuracy filtering post-prediction:
+For other models, you can apply target performance filtering post-prediction:
 
 1. Group results by predicted barcode
 2. Apply the desired confidence threshold from `target_accuracy_thresholds/*.csv`
-3. Filter predictions that meet or exceed the threshold
-
-*Note: Direct integration of accuracy modes into the main workflow is planned for future release.*
-
-### Choosing the Right Target
-
-Consider these factors when selecting a target accuracy:
-
-- **Higher Accuracy (99.0-99.9%)**
-  - Fewer but more reliable assignments
-  - Best for applications requiring high precision
-  - Recommended for critical analyses
-
-- **Lower Accuracy (95.0-97.5%)**
-  - Larger dataset with more assignments
-  - Suitable for exploratory analyses
-  - Better for applications that can tolerate some noise
-
-Choose based on your experimental requirements and the relative importance of precision versus dataset size.
+3. Predictions that meet or exceed the threshold are kept, others are predicted as -1 (unclassified)
 
 ## Performance
 
 ### Runtime
 - Scales linearly with number of cores
 - RNA004: ~2-3 minutes per 100,000 reads (8 cores, standard laptop)
+- **WarpDemuX-tRNA**: 38s per 100,000 reads (16 cores)
 
 ### Memory Requirements
+
+#### polyA RNA (RNA002, RNA004)
 - Recommended: 2GB RAM per core (with default minibatch size of 1000)
 - Example: 16GB RAM for 8 cores
+
+#### WarpDemuX-tRNA (RNA004)
+- Recommended: 1GB RAM per core (with default minibatch size of 1000)
+- Example: 16GB RAM for 16 cores
 
 ## Expected input and output 
 
@@ -250,7 +227,7 @@ WarpDemuX exclusively supports the pod5 file format. You must convert any fast5/
 ### Output
 
 
-WarpDemuX creates an output directory named `WDX[n_barcodes]_[chemistry]_[version]_[date]_[time]_[UUID]` with the following structure:
+WarpDemuX creates an output directory named `warpdemux_[model]_[date]_[time]_[UUID]` with the following structure:
 
 ```
 WDX[n_barcodes]_[chemistry]_[version]_[date]_[time]_[UUID]/
@@ -266,14 +243,14 @@ The `predictions/` directory contains `barcode_predictions_[INDEX].csv` files, w
 | Column Name | Description |
 |------------|-------------|
 | read_id | Pod5 file read ID (**Note**: May differ from basecalling BAM file read ID, see [split reads](#split-reads)) |
-| predicted_barcode | Predicted barcode (`-1` indicates noise classification) |
+| predicted_barcode | Predicted barcode (-1 indicates noise classification) |
 | confidence_score | Prediction confidence score |
 | p01-p12 | Individual probability scores for each barcode |
 | p-1 | Probability score for noise class |
 
 Note: Available probability columns (p01-p12) vary by model.
 
-**Note:** For the WDX4b_tRNA_rna004_v0_4_6 model there is no noise class. Predictions that are filtered out due to target performance are assigned a predicted barcode of `-1`.
+**Note:** For the WDX4b_tRNA_rna004_v0_4_6 model there is no noise class. Predictions that are filtered out due to target performance are assigned a predicted barcode of -1.
 
 
 ### Failed Reads Output
@@ -295,7 +272,7 @@ The `failed_reads/` directory contains `failed_reads_[INDEX].csv` files with det
 
 **RNA Transcript Statistics:**
 - rna_preloaded_start/len: Position and length (post-polya)
-- rna_preloaded_mean/std/med/mad: Signal statistics (pA)
+- rna_preloaded_mean/std/med/mad: Signalother models statistics (pA)
 
 **Detection Method Results:**
 - llr_*: LLR method detection results
@@ -355,7 +332,7 @@ Note that increasing `max_obs_trace` will result in slower processing times, so 
 
 ## Barcode-based adaptive sampling (Live Balancing)
 
-Live balancing has been executed as a proof-of-concept for RNA002. 
+Live balancing has been executed as a proof-of-concept for RNA002 and is not supported for RNA004 or WarpDemuX-tRNA.
 
 ### Adapter classification
 
