@@ -14,8 +14,11 @@ import os
 import shutil
 import sys
 import uuid
-from typing import List, Optional
+import warnings
+from argparse import Action
+from typing import Any, Iterable, List, NamedTuple, Optional, Type, Union
 
+import numpy as np
 import pandas as pd
 import toml
 from adapted.io_utils import input_to_filelist
@@ -29,6 +32,7 @@ from warpdemux.config.file_proc import (
     TaskConfig,
 )
 from warpdemux.config.utils import get_model_spc_config
+from warpdemux.models.utils import available_models
 
 
 def str2bool(v):
@@ -42,136 +46,189 @@ def str2bool(v):
         raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
-parent_parser = argparse.ArgumentParser(
+class ArgumentParams(NamedTuple):
+    name_or_flags: "tuple[str, ...]"
+    action: Optional[Union[str, Type[Action]]] = None
+    nargs: Optional[Union[int, str]] = None
+    const: Any = None
+    default: Any = None
+    type: Optional[Any] = None
+    choices: Optional[Iterable[Any]] = None
+    required: bool = False
+    help: Optional[str] = None
+    metavar: Optional[Union[str, "tuple[str, ...]"]] = None
+    dest: Optional[str] = None
+
+    def add_to_parser(
+        self,
+        parser: argparse.ArgumentParser,
+        required: Optional[bool] = None,
+        use_default: Optional[bool] = True,
+    ):
+        params = self._asdict()
+        del params["name_or_flags"]
+        if required is not None:
+            params["required"] = required
+        if use_default:
+            params["default"] = self.default
+        parser.add_argument(*self.name_or_flags, **params)
+
+
+io_arguments = {
+    "input": ArgumentParams(
+        name_or_flags=("--input", "-i"),
+        type=str,
+        nargs="+",
+        required=True,
+        help=("Input file(s) or directory(s)."),
+    ),
+    "output": ArgumentParams(
+        name_or_flags=("--output", "-o"),
+        type=str,
+        default=None,
+        help=(
+            "Path to where the run output folder should be created. "
+            "Default is the current working directory."
+        ),
+    ),
+    "save_fpts": ArgumentParams(
+        name_or_flags=("--save_fpts",),
+        type=str2bool,
+        default=False,
+        help=(
+            "Whether to save the barcode fingerprints as .npz files. "
+            "Default is False."
+        ),
+    ),
+    "save_dwell_times": ArgumentParams(
+        name_or_flags=("--save_dwell_times",),
+        type=str2bool,
+        default=False,
+        help=(
+            "Whether to save the dwell times per segment along with the fingerprints. "
+            "Ignored if --save_fpts is False. Default is False."
+        ),
+    ),
+    "save_boundaries": ArgumentParams(
+        name_or_flags=("--save_boundaries",),
+        type=str2bool,
+        default=False,
+        help=("Whether to save the boundaries as .csv files. Default is False."),
+    ),
+    "read_id_csv": ArgumentParams(
+        name_or_flags=("--read_id_csv", "-r"),
+        type=str,
+        default=None,
+        help=(
+            "Path to a csv file containing read IDs to be processed. "
+            "Should contain a 'read_id' column."
+        ),
+    ),
+}
+
+config_arguments = {
+    "model_name": ArgumentParams(
+        name_or_flags=("--model_name", "-m"),
+        type=str,
+        required=True,
+        choices=available_models(),
+        help=(
+            "Name of the model to use for classification. "
+            "The model name is directly linked to the preprocessing config that will be used, "
+            "see details in models/model_files/config.toml."
+        ),
+    ),
+    "export": ArgumentParams(
+        name_or_flags=("--export", "-e"),
+        type=str,
+        default=None,
+        help=(
+            "Export custom signal processing configuration in format 'section.param=value1,section.param=value2'. "
+            "Example: '--export cnn_boundaries.fallback_to_llr_short_reads=true,cnn_boundaries.polya_cand_k=15'. "
+            "Alternatively, you can provide a path to a toml file containing the custom configuration. "
+            "Example: '--export /path/to/config.toml'. "
+            "Exported values will override the default values in the model config. None specified values will be left unchanged. "
+            "Only use this argument if you know what you are doing. "
+            "Default is None."
+        ),
+    ),
+}
+
+batch_arguments = {
+    "ncores": ArgumentParams(
+        name_or_flags=("--ncores", "-j"),
+        type=int,
+        required=True,
+        help=("Number of cores to use for parallel processing."),
+    ),
+    "batch_size_output": ArgumentParams(
+        name_or_flags=("--batch_size_output", "-b"),
+        type=int,
+        default=4000,
+        help=("Number of reads per output file. Default is 4000."),
+    ),
+    "minibatch_size": ArgumentParams(
+        name_or_flags=("--minibatch_size", "-s"),
+        type=int,
+        default=1000,
+        help=("Number of reads per minibatch. Default is 1000."),
+    ),
+}
+
+io_parser = argparse.ArgumentParser(
+    add_help=False,
+)
+config_parser = argparse.ArgumentParser(
+    add_help=False,
+)
+batch_parser = argparse.ArgumentParser(
     add_help=False,
 )
 
-parent_parser.add_argument(
-    "--input",
-    "-i",
-    type=str,
-    nargs="+",
-    help=("Input file(s) or directory(s)."),
-)
-parent_parser.add_argument(
-    "--output",
-    "-o",
-    type=str,
-    default=None,
-    help="Path to where the run output folder should be created. Default is the current working directory.",
+parser_second_tier = argparse.ArgumentParser(
+    add_help=False,
 )
 
-parent_parser.add_argument(
-    "-m",
-    "--model_name",
-    type=str,
-    default="WDX4_rna004_v0_4_4",
-    help="Name of the model to use for classification. Default is `WDX4_rna004_v0_4_4`.",
+
+for io_param in io_arguments:
+    io_arguments[io_param].add_to_parser(io_parser)
+
+for config_param in config_arguments:
+    config_arguments[config_param].add_to_parser(config_parser)
+
+for batch_param in batch_arguments:
+    batch_arguments[batch_param].add_to_parser(batch_parser)
+
+    batch_arguments[batch_param].add_to_parser(
+        parser_second_tier, required=False, use_default=False
+    )
+
+config_arguments["model_name"].add_to_parser(
+    parser_second_tier, required=False, use_default=False
 )
 
-parent_parser.add_argument(
-    "-e",
-    "--export",
-    type=str,
-    default=None,
-    help=(
-        "Export custom configuration in format 'section.param=value1,section.param=value2'. "
-        "Example: '--export cnn_boundaries.fallback_to_llr_short_reads=true,cnn_boundaries.polya_cand_k=15'. "
-        "Alternatively, you can provide a path to a toml file containing the custom configuration. "
-        "Example: '--export /path/to/config.toml'. "
-        "Only use this argument if you know what you are doing. Default is None."
-    ),
-)
-
-parent_parser.add_argument(
-    "--save_fpts",
-    type=str2bool,
-    default=False,
-    help="Whether to save the barcode fingerprints as .npz files. Default is False.",
-)
-
-parent_parser.add_argument(
-    "--save_dwell_times",
-    type=str2bool,
-    default=False,
-    help="Whether to save the dwell times per segment along with the fingerprints. Ignored if --save_fpts is False. Default is False.",
-)
-
-parent_parser.add_argument(
-    "--save_boundaries",
-    type=str2bool,
-    default=False,
-    help="Whether to save the boundaries as .csv files. Default is False.",
-)
-
-parent_parser.add_argument(
-    "-j",
-    "--ncores",
-    type=int,
-    default=None,
-    help=(
-        "Number of num_proc to use for parallel processing. If not specified, all"
-        " available cores will be used."
-    ),
-)
-
-parent_parser.add_argument(
-    "-b",
-    "--batch_size_output",
-    type=int,
-    default=4000,
-    help=("Number of reads per output file. Default is 4000."),
-)
-
-parent_parser.add_argument(
-    "-s",
-    "--minibatch_size",
-    type=int,
-    default=1000,
-    help=("Number of reads per minibatch. Default is 1000."),
-)
-
-parent_parser.add_argument(
-    "--read_id_csv",
-    type=str,
-    default=None,
-    help=(
-        "Path to a csv file containing read IDs to be processed. Should contain a"
-        " 'read_id' column."
-    ),
-)
-
-parent_parser.add_argument(
-    "--read_id_csv_colname",
-    type=str,
-    default="read_id",
-    help=(
-        "Column name in 'read_id_csv' containing the read IDs to be processed. Defaults"
-        " to 'read_id'."
-    ),
-)
 parser = argparse.ArgumentParser(
     description="WarpDemuX: Adapter barcode classification for nanopore direct RNA sequencing.",
 )
-
 
 subparsers = parser.add_subparsers(title="workflows", dest="command")
 
 demux_parser = subparsers.add_parser(
     "demux",
     help="Demultiplex raw signal or preprocessed barcode fingerprints.",
-    parents=[parent_parser],
+    parents=[io_parser, config_parser, batch_parser],
 )
 
 prep_parser = subparsers.add_parser(
     "prep",
     help="Prepare data for WarpDemuX. This ignores most model-specific parameters.",
-    parents=[parent_parser],
+    parents=[io_parser, config_parser, batch_parser],
 )
 
 continue_parser = subparsers.add_parser(
     "continue",
     help="Continue from a previous (incomplete) run.",
+    parents=[parser_second_tier],
 )
 
 continue_parser.add_argument(
@@ -180,16 +237,16 @@ continue_parser.add_argument(
     help="Path to a previous WarpDemuX output directory to continue processing from.",
 )
 
-
-parser_retry = subparsers.add_parser(
-    "retry",
-    help="Retry processing failed reads.",
+predict_parser = subparsers.add_parser(
+    "predict",
+    help="Predict barcode identities from preprocessed barcode fingerprints.",
+    parents=[parser_second_tier],
 )
 
-parser_retry.add_argument(
-    "retry_from",
+predict_parser.add_argument(
+    "predict_from",
     type=str,
-    help="Path to a folder containing the results of a previous run.",
+    help="Path to a previous WarpDemuX output directory to continue processing from.",
 )
 
 
@@ -204,41 +261,110 @@ def parse_export_string(export_str):
         for section, params in toml_data.items():
             for attr, value in params.items():
                 export_vals[(section, attr)] = value
-
         return export_vals
-    else:
-        export_vals = {}
-        try:
-            for pair in export_str.split(","):
-                if "=" not in pair:
-                    raise ValueError(f"Missing '=' in parameter pair: {pair}")
 
-                key, value = pair.split("=", maxsplit=1)
-                key = key.strip()
-                if "." not in key:
-                    raise ValueError(f"Missing '.' in parameter key: {key}")
+    import shlex
 
-                section, attr = key.split(".", maxsplit=1)
-                if not section or not attr:
-                    raise ValueError(f"Empty variable or attribute in key: {key}")
+    export_vals = {}
+    try:
+        # Use shlex to properly handle nested structures and quotes
+        pairs = shlex.split(export_str, posix=True)
+        for pair in pairs:
+            if "=" not in pair:
+                raise ValueError(f"Missing '=' in parameter pair: {pair}")
 
-                # interpret value as bool, float or int if possible
-                try:
-                    # Handle boolean strings case-insensitively
-                    if value.strip().lower() in ("true", "false"):
-                        value = value.strip().lower() == "true"
-                    else:
-                        value = ast.literal_eval(value)
-                except (ValueError, SyntaxError):
-                    value = value.strip()
+            key, value = pair.split("=", maxsplit=1)
+            key = key.strip()
+            if "." not in key:
+                raise ValueError(f"Missing '.' in parameter key: {key}")
 
-                export_vals[(section.strip(), attr.strip())] = value
-            return export_vals
-        except ValueError as e:
-            raise argparse.ArgumentTypeError(
-                f"Invalid export string format: {str(e)}. "
-                "Must be in format 'section.attr=value1,section.attr2=value2'"
-            )
+            section, attr = key.split(".", maxsplit=1)
+            if not section or not attr:
+                raise ValueError(f"Empty variable or attribute in key: {key}")
+
+            # Parse the value
+            try:
+                value = value.strip()
+                # Handle boolean strings case-insensitively
+                if value.lower() in ("true", "false"):
+                    value = value.lower() == "true"
+                else:
+                    value = ast.literal_eval(value)
+            except (ValueError, SyntaxError):
+                value = value.strip()
+
+            export_vals[(section.strip(), attr.strip())] = value
+        return export_vals
+
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(
+            f"Invalid export string format: {str(e)}. "
+            "Examples:\n"
+            "  section.attr=value1 section.attr2=value2\n"
+            "  section.attr='string with spaces'\n"
+            "  section.attr=(1,2,3)\n"
+            '  section.attr="complex string, with comma"'
+        )
+
+
+def backup_file(file_path: str):
+    dir_path = os.path.dirname(file_path)
+    basename = os.path.basename(file_path)
+    name, extension = os.path.splitext(basename)
+    backup_path = lambda suffix: os.path.join(
+        dir_path, f"{name}_previous{suffix}.{extension}"
+    )
+    suffix = ""
+    while os.path.exists(backup_path(suffix)):
+        if suffix == "":
+            suffix = 1
+        else:
+            suffix += 1
+
+    shutil.copy(file_path, backup_path(suffix))
+
+
+def get_first_tier_dir(cli_args: argparse.Namespace) -> str:
+    cli_vars = vars(cli_args)
+    from_dir_dict = {
+        "continue": cli_vars.get("continue_from", ""),
+        "predict": cli_vars.get("predict_from", ""),
+        "demux": "",
+        "prep": "",
+    }
+    return from_dir_dict[cli_args.command]
+
+
+def handle_second_tier_args(cli_args: argparse.Namespace) -> argparse.Namespace:
+    cli_vars = vars(cli_args)
+    from_dir = get_first_tier_dir(cli_args)
+
+    try:
+        # load the parser arguments from the command.json file
+        with open(os.path.join(from_dir, "command.json"), "r") as f:
+            command_dict = json.load(f)
+    except FileNotFoundError:
+        parser.error(
+            "No command.json file found in the continue_from directory. "
+            "Please provide a valid continue-from directory."
+        )
+
+    # command_dict and its args.command attribute are leading.
+    # however, if specific processing arguments are provided at runtime, they are used instead
+    second_tier_args = [
+        action.dest for action in parser_second_tier._actions if action.dest != "help"
+    ]
+    for arg in second_tier_args:
+        if arg in cli_vars and cli_vars[arg] is not None:
+            if arg == "model_name":
+                warnings.warn(
+                    "Model is changed in second tier, unable to validate compatibility with the previous run. Make sure you know what you are doing!",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+            command_dict[arg] = cli_vars[arg]
+    args = argparse.Namespace(**command_dict)
+    return args
 
 
 def parse_args(in_args: Optional[List[str]] = None) -> Config:
@@ -246,53 +372,38 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
     args = in_args or sys.argv[1:]
     args = parser.parse_args(args)
 
-    if args.command == "continue":
-        try:
-            # load the parser arguments from the command.json file
-            with open(os.path.join(args.continue_from, "command.json"), "r") as f:
-                command_dict = json.load(f)
-        except FileNotFoundError:
-            parser.error(
-                "No command.json file found in the continue_from directory. "
-                "Please provide a valid continue-from directory."
-            )
+    cli_command = args.command
 
-        # create a backup of the command.json file
-        shutil.copy(
-            os.path.join(args.continue_from, "command.json"),
-            os.path.join(args.continue_from, "command_previous.json"),
-        )
+    mode_continue = False
+    continue_from_dir = ""
 
-        if "retry_from" in command_dict:
-            del command_dict["retry_from"]
+    second_tier_commands = ["continue", "predict"]
+    if cli_command in second_tier_commands:
+        from_dir = get_first_tier_dir(args)
 
-        run_dir = args.continue_from
-        args.__dict__.update(command_dict)  # update all params, including `command`
-    elif args.command == "retry":
-        try:
-            # load the parser arguments from the command.json file
-            with open(os.path.join(args.retry_from, "command.json"), "r") as f:
-                command_dict = json.load(f)
-        except FileNotFoundError:
-            parser.error(
-                "No command.json file found in the retry_from directory. "
-                "Please provide a valid continue-from directory."
-            )
+        run_dir = from_dir
+        args = handle_second_tier_args(args)
 
-        # create a backup of the command.json file
-        shutil.copy(
-            os.path.join(args.retry_from, "command.json"),
-            os.path.join(args.retry_from, "command_previous.json"),
-        )
+        if cli_command == "continue":
+            continue_from_dir = from_dir
+            mode_continue = True
 
-        # if continue_from is set from a previous run, remove it from args
-        if "continue_from" in command_dict:
-            del command_dict["continue_from"]
+        elif cli_command == "predict":
+            if os.path.exists(os.path.join(from_dir, "predictions")):
+                raise ValueError(
+                    "Prediction directory already exists, use continue instead."
+                )
 
-        run_dir = args.retry_from
-        args.__dict__.update(command_dict)  # update all params, including `command`
+            if args.command != "prep":  # has been updated in handle_second_tier_args
+                raise ValueError("Cannot predict from a non-prep run.")
 
-        run_dir = args.retry_from
+            args.command = "predict"  # overwrite command back to predict
+            args.input = [os.path.join(run_dir, "fingerprints")]
+
+            backup_file(os.path.join(run_dir, "command.json"))
+
+        # At this point, args.command is the command to be executed
+
     else:
         args.output = args.output or os.getcwd()
 
@@ -306,15 +417,24 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
             + str(uuid.uuid4())[:8],
         )
 
+    do_predict = args.command in ["demux", "predict"]
+    do_preproc = args.command in ["demux", "prep"]
+
     read_ids = []
 
     if args.read_id_csv is not None:
-        read_ids = pd.read_csv(
-            args.read_id_csv,
-        )[args.read_id_csv_colname].values
+        read_ids = np.array(
+            pd.read_csv(
+                args.read_id_csv,
+            )["read_id"].values
+        )
 
-    endswiths = [".pod5"]
-    basenameprefix = ""
+    if do_preproc:
+        endswiths = [".pod5"]
+        basenameprefix = ""
+    else:
+        endswiths = [".npz"]
+        basenameprefix = "barcode_fpts_"
 
     files = input_to_filelist(
         args.input, endswiths=endswiths, basenameprefix=basenameprefix
@@ -328,16 +448,19 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
     input_config = InputConfig(
         files=files,
         read_ids=read_ids,
-        continue_from=args.continue_from if "continue_from" in args else "",
-        retry_from=args.retry_from if "retry_from" in args else "",
+        continue_from=continue_from_dir,
     )
 
-    num_proc = (args.ncores or os.cpu_count()) or -1
-
     batch_config = BatchConfig(
-        num_proc=num_proc,
+        num_proc=args.ncores,
         batch_size_output=args.batch_size_output,
         minibatch_size=args.minibatch_size,
+    )
+
+    task_config = TaskConfig(
+        command=args.command,
+        predict=do_predict,
+        preprocess=do_preproc,
     )
 
     if args.command == "prep":
@@ -347,61 +470,69 @@ def parse_args(in_args: Optional[List[str]] = None) -> Config:
             save_fpts=True,
             save_boundaries=args.save_boundaries,
             save_predictions=False,
-            output_subdir_fail=(
-                "failed_reads_retry" if "retry_from" in args else "failed_reads"
-            ),
         )
-        task_config = TaskConfig(
-            predict=False,
-        )
-    else:
+
+    elif args.command == "demux":
         output_config = OutputConfig(
             output_dir=run_dir,
             save_dwell_time=args.save_dwell_times,
             save_fpts=args.save_fpts,
             save_boundaries=args.save_boundaries,
-            output_subdir_fail=(
-                "failed_reads_retry" if "retry_from" in args else "failed_reads"
-            ),
+            save_predictions=True,
         )
-        task_config = TaskConfig(
-            predict=True,
+    elif args.command == "predict":
+        output_config = OutputConfig(
+            output_dir=run_dir,
+            save_dwell_time=False,
+            save_fpts=False,
+            save_boundaries=False,
+            save_predictions=True,
         )
+    else:
+        raise ValueError("Invalid command.")  # should never happen
 
-    spc = get_model_spc_config(args.model_name)
+    if do_predict:
+        cc = ClassificationConfig(
+            model_name=args.model_name,
+        )
+    else:
+        cc = None
 
-    if args.export is not None:
-        update_dict = parse_export_string(args.export)
-        assert update_dict is not None
-        for (section, attr), value in update_dict.items():
-            section_dict = getattr(
-                spc, section
-            ).copy()  # Create a copy of the section dictionary
-            section_dict[attr] = value  # Update the value
-            setattr(spc, section, section_dict)  # Set the updated dictionary
+    if do_preproc:
+        spc = get_model_spc_config(args.model_name)
 
-    spc.update_primary_method()
-    spc.update_sig_preload_size()
+        if args.export is not None:
+            update_dict = parse_export_string(args.export)
+            assert update_dict is not None
+            for (section, attr), value in update_dict.items():
+                section_dict = getattr(
+                    spc, section
+                ).copy()  # Create a copy of the section dictionary
+                section_dict[attr] = value  # Update the value
+                setattr(spc, section, section_dict)  # Set the updated dictionary
 
-    cc = ClassificationConfig(
-        model_name=args.model_name,
-    )
+        spc.update_primary_method()
+        spc.update_sig_preload_size()
+
+    else:
+        spc = None
 
     config = Config(
         input=input_config,
         batch=batch_config,
         output=output_config,
-        sig_proc=spc,
-        classif=cc,
+        sig_proc=spc,  # type: ignore
+        classif=cc,  # type: ignore
         task=task_config,
-    )
+    )  # TODO: handle optional attributes
 
-    os.makedirs(run_dir, exist_ok=True)
+    if not mode_continue:
+        os.makedirs(run_dir, exist_ok=True)
 
-    # Create command.json file
-    command_dict = vars(args)
-    command_json_path = os.path.join(run_dir, "command.json")
-    with open(command_json_path, "w") as f:
-        json.dump(command_dict, f, indent=2)
+        # Create command.json file
+        command_dict = vars(args)
+        command_json_path = os.path.join(run_dir, "command.json")
+        with open(command_json_path, "w") as f:
+            json.dump(command_dict, f, indent=2)
 
     return config

@@ -54,9 +54,7 @@ class InputConfig(BaseConfig):
     files: List[str] = field(default_factory=list)
     read_ids: Union[List[str], np.ndarray] = field(default_factory=list)
     continue_from: str = ""
-    retry_from: str = ""
     n_reads: int = -1
-    preprocessed: bool = False
 
 
 @dataclass
@@ -70,4 +68,6 @@ class BatchConfig(BaseConfig):
 
 @dataclass
 class TaskConfig(BaseConfig):
+    preprocess: bool = True
     predict: bool = True
+    command: str = ""
