@@ -17,7 +17,7 @@ Currently supports both SQK-RNA002 and SQK-RNA004 chemistries.
 
 ## Quick Start
 
-Installation takes approximately 10 minutes:
+Installation takes approximately 10 minutes and requires `gcc` to be available in `PATH`.
 
 ```{bash}
 # Clone this repository with the adapt submodule
@@ -36,6 +36,8 @@ cd [path/to/store/WarpDemuX]
 pip install -e '.[live-demux]'
 
 ```
+
+The first time you run WarpDemuX, `gcc` has to be available in your system. When working on a HPC, consider adding/loading the `gcc` module.
 
 ### Using a different branch
 
