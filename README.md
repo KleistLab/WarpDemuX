@@ -122,7 +122,7 @@ For detailed information about barcode design, optimization, and performance cha
 
 ## Quick Start
 
-Installation takes approximately 10 minutes:
+Installation takes approximately 10 minutes and requires `gcc` to be available in `PATH`.
 
 ```{bash}
 # Clone this repository with the adapt submodule
@@ -141,6 +141,8 @@ cd [path/to/store/WarpDemuX]
 pip install -e '.[live-demux]'
 
 ```
+
+The first time you run WarpDemuX, `gcc` has to be available in your system. When working on a HPC, consider adding/loading the `gcc` module.
 
 ### Using a different branch
 
@@ -661,7 +663,7 @@ Try these solutions in order:
 2. **Create Clean Environment** (if module loading doesn't work):
    ```bash
    # Create new environment with minimal dependencies
-   mamba create -n WDX2 python=3.8
+   mamba create -n WDX2 python=3.12
    mamba activate WDX2
    
    # Install WarpDemuX and ADAPTed via pip
