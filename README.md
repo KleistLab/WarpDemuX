@@ -176,7 +176,7 @@ Note: CNN detection is only available for RNA004, while LLR detection is the sta
 | WDX10_rna002_v0_4_4 | RNA002 | polyA RNA | 10 | WDX_bc01, WDX_bc02, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc10, WDX_bc11, WDX_bc12 |
 | WDX12_rna002_v0_4_4 | RNA002 | polyA RNA | 12 | All 12 WDX barcodes |
 | WDX4_rna004_v0_4_4 | RNA004 | polyA RNA | 4 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc07 |
-| WDX4b_rna004_v0_4_6 | RNA004 | polyA RNA | 4 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc07 |
+| WDX4b_rna004_v0_4_6 | RNA004 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc07, WDX_bc11 |
 | WDX4c_rna004_v0_4_6 | RNA004 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc11 |
 | WDX4b_tRNA_rna004_v0_4_7 (**WarpDemuX-tRNA**) | RNA004 | tRNA (Nano-tRNAseq) | 4 | WDX_bc04, WDX_bc05, WDX_bc07, WDX_bc11 |
 
