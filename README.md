@@ -5,6 +5,8 @@
 [![Preprint: RSquare](https://img.shields.io/badge/Research_Square-doi:10.21203/rs.3.rs--4783223/v1-blue)](https://doi.org/10.21203/rs.3.rs-4783223/v1)
 [![Zenodo](https://img.shields.io/badge/Zonodo-doi:10.5281/zenodo.14154555-green)](https://doi.org/10.5281/zenodo.14154555)
 
+### Important Info: Please refer to "Available Models" below for the specific barcodes to be used for RNA004 (and Nano-tRNAseq). Currently, we do not support all 12 barcodes for RNA004 experiments.
+
 WarpDemuX is an ultra-fast and high-accuracy adapter-barcoding and demultiplexing tool for Nanopore direct RNA sequencing. It enhances speed and accuracy through:
 
 - Fast processing of raw signals
