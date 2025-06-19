@@ -32,6 +32,14 @@ When unsure which model to use, we recommend using the default barcode set model
 
 To see which barcodes are used per model, see the column `Barcodes Used` in the respective model table.
 
+### Default (=recommended) barcode sets for RNA004
+
+| Model | Number of samples | WarpDemuX barcodes |
+|-------|-------------------|-------------------|
+| WDX4  | 4                 | 3 4 5 7           |
+| WDX6  | 6                 | 4 5 6 7 11 12     |
+| WDX8  | 8                 | 3 4 5 6 7 9 11 12 |
+| WDX10 | 10                | 3 4 5 6 7 8 9 10 11 12 |
 
 ### Standard WarpDemuX: default (mRNA) protocol
 
@@ -54,6 +62,7 @@ WarpDemuX models for the current sequencing chemistry (RNA004) are optimized for
 **[DEPRECATED MODELS]**
 
 As RNA002 is deprecated, the following models are no longer actively supported.
+
 
 | Model Name | Chemistry | Library Type | # Samples | Barcodes Used |
 |------------|-----------|--------------|-----------|---------------|
@@ -96,6 +105,17 @@ WarpDemuX uses custom barcode sequences embedded within the RTA (Reverse Transcr
 | Barcode 10 | TACCACCTGCCGGCGGCC |
 | Barcode 11 | GCCCGCCGGGGGAGAAGC |
 | Barcode 12 | TTTTTTTTACCGGCAGTT |
+
+To create the barcoded RTA's you need to order the respective oligos. For example:
+
+| Oligo Name | Sequence 5'-3'    |
+|------------|-------------------|
+| WDX_bc01_A | /5Phos/GGTTTTTACTGCCAGTGACTGGTAGTAGGTTC |
+| WDX_bc01_B | GAGGCGAGCGGTCAATTTTAGTCACTGGCAGTAAAAACCTTTTTTTTTT |
+| WDX_bc02_A | /5Phos/GGAGGGGAGAGAGCCCCCCCGGTAGTAGGTTC |
+| WDX_bc02_B | GAGGCGAGCGGTCAATTTTGGGGGGGCTCTCTCCCCTCCTTTTTTTTTT |
+| WDX_bc03_A | /5Phos/GGCACGTCATTTTCCACGTCGGTAGTAGGTTC |
+| ... (etc.) | ... (etc.) |
 
 For detailed information about barcode design, optimization, and performance characteristics, please refer to our manuscript.
 
