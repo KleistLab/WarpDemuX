@@ -14,7 +14,90 @@ WarpDemuX is an ultra-fast and high-accuracy adapter-barcoding and demultiplexin
 - Optimized barcode sets
 - Real-time enrichment capabilities through barcode-specific adaptive sampling
 
-Currently supports both SQK-RNA002 and SQK-RNA004 chemistries.
+WarpDemuX supports the current (SQK-RNA004) sequencing chemistry (SQK-RNA002 is deprecated).
+
+
+## Available models
+
+### Model naming convention
+
+The model name is composed of the following parts:
+
+- `WDX[n_barcodes][alternative-barcode-set-indicator]_[chemistry]_[version]`
+
+When unsure which model to use, we recommend using the default barcode set models. These are the best performing barcode subsets for the respective set sizes.
+
+- `WDX4`, `WDX6`, `WDX10`, etc.: default barcode sets
+- `WDX4b`, `WDX4c`, etc.: alternative barcode sets
+
+To see which barcodes are used per model, see the column `Barcodes Used` in the respective model table.
+
+
+### Standard WarpDemuX: default (mRNA) protocol
+
+WarpDemuX models for the current sequencing chemistry (RNA004) are optimized for reads with poly(A) tails. For datasets with many short poly(A) tails, you have two options:
+
+1. Enable LLR fallback, see [Advanced Usage](#advanced-usage).
+2. Switch to LLR detection entirely (slower but better handles short poly(A) tails)
+
+| Model Name | Chemistry | Library Type | # Samples | Barcodes Used |
+|------------|-----------|--------------|-----------|---------------|
+| WDX4_rna004_v0_4_4 | RNA004 | polyA RNA | 4 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc07 |
+| WDX4b_rna004_v0_4_6 | RNA004 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc07, WDX_bc11 |
+| WDX4c_rna004_v0_4_6 | RNA004 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc11 |
+
+<span style="color:gray"> 
+
+<details>
+<summary>RNA002 models</summary>
+
+**[DEPRECATED MODELS]**
+
+As RNA002 is deprecated, the following models are no longer actively supported.
+
+| Model Name | Chemistry | Library Type | # Samples | Barcodes Used |
+|------------|-----------|--------------|-----------|---------------|
+| WDX-DPC_rna002_v0_4_4 | RNA002 | polyA RNA | 4 | Original DeePlexiCon barcodes |
+| WDX4_rna002_v0_4_4 | RNA002 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc08 |
+| WDX6_rna002_v0_4_4 | RNA002 | polyA RNA | 6 | WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc11 |
+| WDX8_rna002_v0_4_4 | RNA002 | polyA RNA | 8 | WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc11, WDX_bc12 |
+| WDX10_rna002_v0_4_4 | RNA002 | polyA RNA | 10 | WDX_bc01, WDX_bc02, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc10, WDX_bc11, WDX_bc12 |
+| WDX12_rna002_v0_4_4 | RNA002 | polyA RNA | 12 | All 12 WDX barcodes |
+
+</details>
+
+</span>
+
+### WarpDemuX-tRNA: Nano-tRNAseq protocol
+
+**ATTENTION: The WarpDemuX-tRNA is developed for the [Nano-tRNAseq protocol](https://doi.org/10.1038/s41587-023-01743-6) and does not work with data using the [Thomas splint adapter](https://doi.org/10.1021/acsnano.1c06488).**
+
+| Model Name | Chemistry | Library Type | # Samples | Barcodes Used |
+|------------|-----------|--------------|-----------|---------------|
+| WDX4b_tRNA_rna004_v0_4_7 | RNA004 | tRNA (Nano-tRNAseq) | 4 | WDX_bc04, WDX_bc05, WDX_bc07, WDX_bc11 |
+
+## Barcodes
+
+WarpDemuX uses custom barcode sequences embedded within the RTA (Reverse Transcription Adapter) during library preparation. 
+
+### Available Barcodes
+
+| Barcode ID | Barcode sequence    |
+|------------|-------------------|
+| Barcode 1  | TTTTTACTGCCAGTGACT |
+| Barcode 2  | AGGGGAGAGAGCCCCCCC |
+| Barcode 3  | CACGTCATTTTCCACGTC |
+| Barcode 4  | GGAGGCCAGGCGGACCGA |
+| Barcode 5  | ACGGACCTTTTGACTTAA |
+| Barcode 6  | TATTGCATACTGCGCCGC |
+| Barcode 7  | CCACGGAGGGAGGATTGG |
+| Barcode 8  | TTACCGGCAGTGACGGAC |
+| Barcode 9  | CGAGATTGCATCCCCCCC |
+| Barcode 10 | TACCACCTGCCGGCGGCC |
+| Barcode 11 | GCCCGCCGGGGGAGAAGC |
+| Barcode 12 | TTTTTTTTACCGGCAGTT |
+
+For detailed information about barcode design, optimization, and performance characteristics, please refer to our manuscript.
 
 
 ## Quick Start
@@ -135,59 +218,6 @@ Alternatively, you can take a look at one of the other detection methods availab
 
 When using the CNN or `rna_start_peak` methods, there is an automatic fallback to the LLR method for failed reads. You can turn this off by setting the `--export cnn_boundaries.fallback_to_llr=false` or `--export rna_start_peak.fallback_to_llr=false` runtime argument.
 
-## Barcodes
-
-WarpDemuX uses custom barcode sequences embedded within the RTA (Reverse Transcription Adapter) during library preparation. 
-
-### Available Barcodes
-
-| Barcode ID | Barcode sequence    |
-|------------|-------------------|
-| Barcode 1  | TTTTTACTGCCAGTGACT |
-| Barcode 2  | AGGGGAGAGAGCCCCCCC |
-| Barcode 3  | CACGTCATTTTCCACGTC |
-| Barcode 4  | GGAGGCCAGGCGGACCGA |
-| Barcode 5  | ACGGACCTTTTGACTTAA |
-| Barcode 6  | TATTGCATACTGCGCCGC |
-| Barcode 7  | CCACGGAGGGAGGATTGG |
-| Barcode 8  | TTACCGGCAGTGACGGAC |
-| Barcode 9  | CGAGATTGCATCCCCCCC |
-| Barcode 10 | TACCACCTGCCGGCGGCC |
-| Barcode 11 | GCCCGCCGGGGGAGAAGC |
-| Barcode 12 | TTTTTTTTACCGGCAGTT |
-
-For detailed information about barcode design, optimization, and performance characteristics, please refer to our manuscript.
-
-
-## Models
-
-### Available models
-
-
-WarpDemuX RNA004 models are optimized for reads with poly(A) tails. For datasets with many short poly(A) tails, you have two options:
-
-1. Enable LLR fallback, see [Advanced Usage](#advanced-usage).
-2. Switch to LLR detection entirely (slower but better handles short poly(A) tails)
-
-Note: CNN detection is only available for RNA004, while LLR detection is the standard method for RNA002.
-
-| Model Name | Chemistry | Library Type | # Samples | Barcodes Used |
-|------------|-----------|--------------|-----------|---------------|
-| WDX-DPC_rna002_v0_4_4 | RNA002 | polyA RNA | 4 | Original DeePlexiCon barcodes |
-| WDX4_rna002_v0_4_4 | RNA002 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc08 |
-| WDX6_rna002_v0_4_4 | RNA002 | polyA RNA | 6 | WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc11 |
-| WDX8_rna002_v0_4_4 | RNA002 | polyA RNA | 8 | WDX_bc01, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc11, WDX_bc12 |
-| WDX10_rna002_v0_4_4 | RNA002 | polyA RNA | 10 | WDX_bc01, WDX_bc02, WDX_bc03, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc09, WDX_bc10, WDX_bc11, WDX_bc12 |
-| WDX12_rna002_v0_4_4 | RNA002 | polyA RNA | 12 | All 12 WDX barcodes |
-| WDX4_rna004_v0_4_4 | RNA004 | polyA RNA | 4 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc07 |
-| WDX4b_rna004_v0_4_6 | RNA004 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc07, WDX_bc11 |
-| WDX4c_rna004_v0_4_6 | RNA004 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc11 |
-| WDX4b_tRNA_rna004_v0_4_7 (**WarpDemuX-tRNA**) | RNA004 | tRNA (Nano-tRNAseq) | 4 | WDX_bc04, WDX_bc05, WDX_bc07, WDX_bc11 |
-
-
-**Coming soon:**
-- RNA004 tRNA models with larger barcode sets
-
 ## Target Performance Modes
 
 WarpDemuX features a flexible performance control system that lets you optimize the balance between prediction accuracy/precision and data yield. By using barcode-specific calibrated confidence thresholds, you can target a specific performance level for each barcode.
@@ -215,11 +245,11 @@ For other models, you can apply target performance filtering post-prediction:
 
 ### Memory Requirements
 
-#### polyA RNA (RNA002, RNA004)
+#### Standard WarpDemuX
 - Recommended: 2GB RAM per core (with default minibatch size of 1000)
 - Example: 16GB RAM for 8 cores
 
-#### WarpDemuX-tRNA (RNA004)
+#### WarpDemuX-tRNA 
 - Recommended: 1GB RAM per core (with default minibatch size of 1000)
 - Example: 16GB RAM for 16 cores
 
@@ -254,7 +284,7 @@ The `predictions/` directory contains `barcode_predictions_[INDEX].csv` files, w
 
 Note: Available probability columns (p01-p12) vary by model.
 
-**Note:** For the WDX4b_tRNA_rna004_v0_4_6 model there is no noise class. Predictions that are filtered out due to target performance are assigned a predicted barcode of -1.
+**Note:** For the WarpDemuX-tRNA models there is no noise class. Predictions that are filtered out due to target performance are assigned a predicted barcode of -1.
 
 
 ### Failed Reads Output
@@ -335,6 +365,9 @@ warpdemux demux [...] --save_boundaries true
 Note that increasing `max_obs_trace` will result in slower processing times, so consider the tradeoff between accuracy and speed based on your specific needs.
 
 ## Barcode-based adaptive sampling (Live Balancing)
+
+<details>
+<summary>Details</summary>
 
 Live balancing has been executed as a proof-of-concept for RNA002 and is not supported for RNA004 or WarpDemuX-tRNA.
 
@@ -491,6 +524,9 @@ cd [path/to/WarpDemuX]
 
 python -m warpdemux.live_balancing.dummy --config_file warpdemux/../test_data/live_balancing/config_only_read_count.toml
 ```
+
+</details>
+
 
 ## Troubleshooting
 
