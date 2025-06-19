@@ -38,7 +38,6 @@ To see which barcodes are used per model, see the column `Barcodes Used` in the 
 |-------|-------------------|-------------------|
 | WDX4  | 4                 | 3 4 5 7           |
 | WDX6  | 6                 | 4 5 6 7 11 12     |
-| WDX8  | 8                 | 3 4 5 6 7 9 11 12 |
 | WDX10 | 10                | 3 4 5 6 7 8 9 10 11 12 |
 
 ### Standard WarpDemuX: default (mRNA) protocol
@@ -50,9 +49,11 @@ WarpDemuX models for the current sequencing chemistry (RNA004) are optimized for
 
 | Model Name | Chemistry | Library Type | # Samples | Barcodes Used |
 |------------|-----------|--------------|-----------|---------------|
-| WDX4_rna004_v0_4_4 | RNA004 | polyA RNA | 4 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc07 |
-| WDX4b_rna004_v0_4_6 | RNA004 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc07, WDX_bc11 |
-| WDX4c_rna004_v0_4_6 | RNA004 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc11 |
+| WDX4_rna004_v1_0 | RNA004 | polyA RNA | 4 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc07 |
+| WDX4b_rna004_v1_0 | RNA004 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc07, WDX_bc11 |
+| WDX4c_rna004_v1_0 | RNA004 | polyA RNA | 4 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc11 |
+| WDX6_rna004_v1_0 | RNA004 | polyA RNA | 6 | WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc11, WDX_bc12 |
+| WDX10_rna004_v1_0 | RNA004 | polyA RNA | 10 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc06, WDX_bc07, WDX_bc08, WDX_bc09, WDX_bc10, WDX_bc11, WDX_bc12 |
 
 <span style="color:gray"> 
 
@@ -61,7 +62,7 @@ WarpDemuX models for the current sequencing chemistry (RNA004) are optimized for
 
 **[DEPRECATED MODELS]**
 
-As RNA002 is deprecated, the following models are no longer actively supported.
+As RNA002 is deprecated, the following models are no longer supported (moved to `DEPRECATED` folder).
 
 
 | Model Name | Chemistry | Library Type | # Samples | Barcodes Used |
@@ -83,7 +84,21 @@ As RNA002 is deprecated, the following models are no longer actively supported.
 
 | Model Name | Chemistry | Library Type | # Samples | Barcodes Used |
 |------------|-----------|--------------|-----------|---------------|
-| WDX4b_tRNA_rna004_v0_4_7 | RNA004 | tRNA (Nano-tRNAseq) | 4 | WDX_bc04, WDX_bc05, WDX_bc07, WDX_bc11 |
+| WDX4_tRNA_rna004_v1_0 (**Recommended**) | RNA004 | tRNA (Nano-tRNAseq) | 4 | WDX_bc03, WDX_bc04, WDX_bc05, WDX_bc07 |
+| WDX4b_tRNA_rna004_v1_0 | RNA004 | tRNA (Nano-tRNAseq) | 4 | WDX_bc04, WDX_bc05, WDX_bc07, WDX_bc11 |
+
+
+We recommend using the WDX4_tRNA_rna004_v1_0 model for Nano-tRNAseq data, which has improved performance compared to the WDX4b_tRNA_rna004_v1_0 model, especially in terms of recovery:
+
+|   WDX_bc | Precision   | Recall      | Recovery     |
+|---------:|:------------|:------------|:-------------|
+|        4 | 0.993       | 0.988       | 95.210 (+3%) |
+|        5 | 0.982 (-1%) | 0.991       | 98.890       |
+|        7 | 0.991 (+1%) | 0.991       | 98.780 (+3%) |
+|        3 (vs 11) | 0.995 (+1%) | 0.992 (+1%) | 99.380 (+7%) |
+<caption><b>WDX-tRNA performance metrics for WDX4_tRNA_rna004_v1_0 vs WDX4b_tRNA_rna004_v1_0.</b></caption>
+
+
 
 ## Barcodes
 
@@ -339,9 +354,11 @@ WarpDemuX features a flexible performance control system that lets you optimize 
 
 Automatic target performance filtering (99% precision) is available for the following models:
 
-- WDX4_rna004_v0_4_4
-- WDX4c_rna004_v0_4_6
-- WDX4b_tRNA_rna004_v0_4_7
+- WDX4_rna004_v1_0
+- WDX4c_rna004_v1_0
+- WDX4b_tRNA_rna004_v1_0
+- WDX6_rna004_v1_0
+- WDX10_rna004_v1_0
 
 For these models, predictions below the target confidence threshold are automatically predicted as -1 (unclassified).
 

@@ -1,13 +1,42 @@
-# Changelog
+# WarpDemuX CHANGELOG
 
-## Unreleased
+## [v1.0.0] - 2025-12-22
 
 ### Changed
+
+- WarpDemuX now requires python 3.12 or higher.
+- Model renaming: 
+ - `WDX-DPC_rna002_v0_4_4` -> `WDX-DPC_rna002_v1_0`
+ - `WDX4_rna002_v0_4_4` -> `WDX4_rna002_v1_0`
+ - `WDX6_rna002_v0_4_4` -> `WDX6_rna002_v1_0`
+ - `WDX8_rna002_v0_4_4` -> `WDX8_rna002_v1_0`
+ - `WDX10_rna002_v0_4_4` -> `WDX10_rna002_v1_0`
+ - `WDX12_rna002_v0_4_4` -> `WDX12_rna002_v1_0`
+ - `WDX4_rna004_v0_4_4` -> `WDX4_rna004_v1_0`
+ - `WDX4b_rna004_v0_4_7` -> `WDX4b_rna004_v1_0`
+ - `WDX4c_rna004_v0_4_6` -> `WDX4c_rna004_v1_0`
+ - `WDX4b_tRNA_rna004_v0_4_7` -> `WDX4b_tRNA_rna004_v1_0`
 
 - Output csv files are stored as gzip-compressed files (`.csv.gz`) rather than plain csv files (`.csv`).
 - The default value for `batch_size_output` has been increased to 40000.
 - Changed `read_id` column name to `#read_id` in predictions output csv files. This means the header line now starts with '#' for compatibility with other tools.
 
+ ### Added
+ 
+- New models released:
+ - `WDX4_tRNA_rna004_v1_0`
+ - `WDX6_rna004_v1_0`
+ - `WDX10_rna004_v1_0`
+
+### Removed
+
+- The following models have been removed (moved to `DEPRECATED` folder):
+ - `WDX-DPC_rna002_v0_4_4`
+ - `WDX4_rna002_v0_4_4`
+ - `WDX6_rna002_v0_4_4`
+ - `WDX8_rna002_v0_4_4`
+ - `WDX10_rna002_v0_4_4`
+ - `WDX12_rna002_v0_4_4`
 
 ## [v0.4.7] - 2025-03-21
 

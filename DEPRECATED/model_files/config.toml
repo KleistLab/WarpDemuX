@@ -1,0 +1,36 @@
+[WDX-DPC_rna002_v1_0]
+num_bcs = 4
+SQK = "RNA002"
+spc = "rna002_70bps@v1.0"
+which_barcodes = ['dpc1', 'dpc2', 'dpc3', 'dpc4']
+
+[WDX4_rna002_v1_0]
+num_bcs = 4
+SQK = "RNA002"
+spc = "rna002_70bps@v1.0"
+which_barcodes = [4, 5, 6, 8]
+
+[WDX6_rna002_v1_0]
+num_bcs = 6
+SQK = "RNA002"
+spc = "rna002_70bps@v1.0"
+which_barcodes = [1, 3, 5, 6, 7, 11]
+
+[WDX8_rna002_v1_0]
+num_bcs = 8
+SQK = "RNA002"
+spc = "rna002_70bps@v1.0"
+which_barcodes = [1, 3, 5, 6, 7, 9, 11, 12]
+
+[WDX10_rna002_v1_0]
+num_bcs = 10
+SQK = "RNA002"
+spc = "rna002_70bps@v1.0"
+which_barcodes = [1, 2, 3, 5, 6, 7, 9, 10, 11, 12]
+
+[WDX12_rna002_v1_0]
+num_bcs = 12
+SQK = "RNA002"
+spc = "rna002_70bps@v1.0"
+spc_live = "rna002_70bps@v1.0_live"
+which_barcodes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]

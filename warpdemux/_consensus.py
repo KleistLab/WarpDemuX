@@ -9,7 +9,7 @@ Contact: w.vandertoorn@fu-berlin.de
 import numpy as np
 
 ALL = dict(
-    rna004_130bps_v0_4_6_tRNA=np.array(
+    rna004_130bps_v1_0=np.array(
         [
             -1.5183,
             -1.8727,
