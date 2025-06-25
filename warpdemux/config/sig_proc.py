@@ -6,7 +6,7 @@ Contact: w.vandertoorn@fu-berlin.de
 
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple, Union
 
 from adapted.config.base import BaseConfig as AdaptedBaseConfig
@@ -72,5 +72,5 @@ class SegmentationConfig(AdaptedBaseConfig):
 
 @dataclass
 class SigProcConfig(AdaptedSigProcConfig):
-    sig_extract: SigExtractConfig = SigExtractConfig()
-    segmentation: SegmentationConfig = SegmentationConfig()
+    sig_extract: SigExtractConfig = field(default_factory=SigExtractConfig)
+    segmentation: SegmentationConfig = field(default_factory=SegmentationConfig)
