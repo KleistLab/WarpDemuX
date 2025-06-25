@@ -290,7 +290,7 @@ WDX[n_barcodes]_[chemistry]_[version]_[date]_[time]_[UUID]/
 ```
 
 ### Predictions Output
-The `predictions/` directory contains `barcode_predictions_[INDEX].csv` files, with each file containing `batch_size_output` reads (configurable via command line). For each successfully processed read, the following information is recorded:
+The `predictions/` directory contains gzip-compressed comma-separated value (csv.gz) files, named `barcode_predictions_[INDEX].csv.gz`, with each file containing `batch_size_output` reads (configurable via command line). For each successfully processed read, the following information is recorded:
 
 | Column Name | Description |
 |------------|-------------|
@@ -300,13 +300,13 @@ The `predictions/` directory contains `barcode_predictions_[INDEX].csv` files, w
 | p01-p12 | Individual probability scores for each barcode |
 | p-1 | Probability score for noise class |
 
-Note: Available probability columns (p01-p12) vary by model.
+**Note:** Available probability columns (p01-p12) vary by model, as they depend on the barcodes used in the model.
 
 **Note:** For the WarpDemuX-tRNA models there is no noise class. Predictions that are filtered out due to target performance are assigned a predicted barcode of -1.
 
 
 ### Failed Reads Output
-The `failed_reads/` directory contains `failed_reads_[INDEX].csv` files with detailed signal statistics for reads where adapter detection failed. Key metrics include:
+The `failed_reads/` directory contains gzip-compressed comma-separated value (csv.gz) files, named `failed_reads_[INDEX].csv.gz`, with detailed signal statistics for reads where adapter detection failed. Key metrics include:
 
 **Signal Information:**
 - read_id: Pod5 file read ID
@@ -343,7 +343,7 @@ The `failed_reads/` directory contains `failed_reads_[INDEX].csv` files with det
 For a more detailed explanation of the failed reads output, please refer to the [ADAPTed documentation](https://github.com/KleistLab/ADAPTed/blob/main/README.md#output).
 
 ### Boundaries
-When `--save_boundaries true` is set, successfully detected boundaries are saved to `detected_boundaries_[INDEX].csv` files in the `detected_boundaries/` directory. These files contain the same columns as failed reads output, except for the `fail_reason` column.
+When `--save_boundaries true` is set, successfully detected boundaries are saved to gzip-compressed comma-separated value (csv.gz) files, named `detected_boundaries_[INDEX].csv.gz`, in the `detected_boundaries/` directory. These files contain the same columns as failed reads output, except for the `fail_reason` column.
 
 
 ## Basecalling and split reads

@@ -113,7 +113,7 @@ io_arguments = {
         name_or_flags=("--save_boundaries",),
         type=str2bool,
         default=False,
-        help=("Whether to save the boundaries as .csv files. Default is False."),
+        help=("Whether to save the boundaries as .csv.gz files. Default is False."),
     ),
     "read_id_csv": ArgumentParams(
         name_or_flags=("--read_id_csv", "-r"),

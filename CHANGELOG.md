@@ -1,3 +1,10 @@
+# Changelog
+
+## Unreleased
+
+### Changed
+
+- Output csv files are stored as gzip-compressed files (`.csv.gz`) rather than plain csv files (`.csv`).
 ## [v0.4.7] - 2025-03-21
 
 ### Changed

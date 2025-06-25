@@ -7,6 +7,7 @@ Contact: w.vandertoorn@fu-berlin.de
 """
 
 import concurrent.futures
+import gzip
 import importlib.resources as pkg_resources
 import inspect
 import logging
@@ -139,7 +140,7 @@ def scan_processed_reads(
     if scan_failed:
         fail_sub = os.path.join(continue_from_path, "failed_reads")
         for file in os.listdir(fail_sub):
-            if file.startswith("failed_reads_") and file.endswith(".csv"):
+            if file.startswith("failed_reads_") and file.endswith(".csv.gz"):
                 bidx = int(file.split("_")[-1].split(".")[0])
             max_fail_bidx = max(max_fail_bidx, bidx)
             with open(os.path.join(fail_sub, file), "r") as f:
@@ -148,7 +149,7 @@ def scan_processed_reads(
     if result_type == "predictions":
         pass_sub = os.path.join(continue_from_path, "predictions")
         starts_with = "barcode_predictions_"
-        extension = "csv"
+        extension = "csv.gz"
     elif result_type == "fingerprints":
         pass_sub = os.path.join(continue_from_path, "fingerprints")
         starts_with = "barcode_fpts_"
@@ -158,8 +159,8 @@ def scan_processed_reads(
         if file.startswith(starts_with) and file.endswith(extension):
             bidx = int(file.split("_")[-1].split(".")[0])
             max_pass_bidx = max(max_pass_bidx, bidx)
-            if extension == "csv":
-                with open(os.path.join(pass_sub, file), "r") as f:
+            if extension == "csv.gz":
+                with gzip.open(os.path.join(pass_sub, file), "rt") as f:
                     processed_reads.update(
                         line.split(",")[0] for line in f.readlines()[1:]
                     )
@@ -672,7 +673,7 @@ def save_batch_predictions(
         predictions,
         os.path.join(
             config.output.output_dir_pred,
-            f"barcode_predictions_{bidx}.csv",
+            f"barcode_predictions_{bidx}.csv.gz",
         ),
     )
     del predictions
@@ -706,7 +707,7 @@ def save_detect_results(
     if save_boundaries:
         save_detected_boundaries(
             results,  # type: ignore
-            os.path.join(dirn, f"{fn}_{batch_idx}.csv"),
+            os.path.join(dirn, f"{fn}_{batch_idx}.csv.gz"),
             save_fail_reasons=pass_or_fail == "fail",
         )
 
@@ -761,6 +762,7 @@ def save_predictions(
     predictions.to_csv(
         filename,
         index=False,
+        compression="gzip",
     )
 
 
