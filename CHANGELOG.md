@@ -5,6 +5,7 @@
 ### Changed
 
 - Output csv files are stored as gzip-compressed files (`.csv.gz`) rather than plain csv files (`.csv`).
+- The default value for `batch_size_output` has been increased to 40000.
 - Changed `read_id` column name to `#read_id` in predictions output csv files. This means the header line now starts with '#' for compatibility with other tools.
 
 

@@ -164,8 +164,8 @@ batch_arguments = {
     "batch_size_output": ArgumentParams(
         name_or_flags=("--batch_size_output", "-b"),
         type=int,
-        default=4000,
-        help=("Number of reads per output file. Default is 4000."),
+        default=40000,
+        help=("Number of reads per output file. Default is 40000."),
     ),
     "minibatch_size": ArgumentParams(
         name_or_flags=("--minibatch_size", "-s"),
