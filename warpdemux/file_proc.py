@@ -773,11 +773,11 @@ def add_read_id_col_to_predictions(
 
     cols = predictions.columns.tolist()
 
-    if "read_id" in cols:
-        raise ValueError("'read_id' already in dataframe")
+    if "#read_id" in cols:
+        raise ValueError("'#read_id' already in dataframe")
 
-    predictions["read_id"] = read_ids
-    return predictions[["read_id", *cols]]
+    predictions["#read_id"] = read_ids
+    return predictions[["#read_id", *cols]]
 
 
 def worker_progress_report(ridx_dict, ridx_lock, save_predictions: bool = True):

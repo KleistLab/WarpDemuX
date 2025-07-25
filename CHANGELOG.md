@@ -5,6 +5,9 @@
 ### Changed
 
 - Output csv files are stored as gzip-compressed files (`.csv.gz`) rather than plain csv files (`.csv`).
+- Changed `read_id` column name to `#read_id` in predictions output csv files. This means the header line now starts with '#' for compatibility with other tools.
+
+
 ## [v0.4.7] - 2025-03-21
 
 ### Changed
