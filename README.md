@@ -186,6 +186,101 @@ Where:
 
 For further instructions and options, run `warpdemux --help` and `warpdemux demux --help`.
 
+## Finalizing the demultiplexing 
+
+After running the demultiplexing, you can use the barcode predictions to create barcode-specific pod5 files using the [pod5 package](https://pod5-file-format.readthedocs.io/en/latest/).
+
+First, unzip the predictions output and remove the '#' character from the start of the header:
+
+```{bash}
+gunzip -c PREDICTIONS_FILE.csv.gz > PREDICTIONS_FILE.csv # unzip
+sed -i '1s/#read_id/read_id/' PREDICTIONS_FILE.csv # remove '#' from header
+```
+
+Optionally, if the model used for demultiplexing has a noise class, you can filter out the predictions assigned to the noise class (-1):
+
+```{bash}
+awk -F, '$2 != -1' PREDICTIONS_FILE.csv > PREDICTIONS_FILE_filtered.csv
+mv PREDICTIONS_FILE_filtered.csv PREDICTIONS_FILE.csv
+```
+
+Then, create barcode-specific pod5 files:
+
+```{bash}
+pod5 subset POD5_FILE [POD5_FILE ...] --table PREDICTIONS_FILE.csv --columns predicted_barcode --template "{predicted_barcode}.subset.pod5" 
+```
+
+Where:
+
+- `POD5_FILE`: Pod5 file(s) to subset
+- `PREDICTIONS_FILE.csv`: Predictions file (unzipped and '#' removed from header)
+
+When processing multiple predictions files, you can use something like this:
+
+```{bash}
+WDX_DIR=/path/to/wardemux_rna004_....
+POD5_DIR=/path/to/pod5_files
+POD5_OUT_DIR=${POD5_DIR}/barcode_subsets
+mkdir -p ${POD5_OUT_DIR}
+
+for PREDICTIONS_FILE in ${WDX_DIR}/predictions/*.csv.gz; do
+    # get suffix of PREDICTIONS_FILE without .csv.gz extension
+    INDEX=${PREDICTIONS_FILE##*_}
+    INDEX=${INDEX%.csv.gz}
+    # unzip and remove '#' from header
+    gunzip -c $PREDICTIONS_FILE > ${PREDICTIONS_FILE%.csv.gz}.csv
+    sed -i '1s/#read_id/read_id/' ${PREDICTIONS_FILE%.csv.gz}.csv
+    # remove rows where predicted_barcode is -1
+    awk -F, 'NR==1 || $2!="-1"' ${PREDICTIONS_FILE%.csv.gz}.csv > ${PREDICTIONS_FILE%.csv.gz}.filtered.csv
+    mv ${PREDICTIONS_FILE%.csv.gz}.filtered.csv ${PREDICTIONS_FILE%.csv.gz}.csv
+    # create barcode-specific pod5 files
+    pod5 subset ${POD5_DIR}/*.pod5 --table ${PREDICTIONS_FILE%.csv.gz}.csv --columns predicted_barcode --template "barcode_{predicted_barcode}.subset_${INDEX}.pod5" -o ${POD5_OUT_DIR}
+done
+```
+
+### BAM file splitting
+
+To split BAM files based on the demultiplexing predictions, first create read ID lists per barcode:
+
+```{bash}
+PREDICTIONS_DIR="path/to/warpdemux_output/predictions"
+OUTPUT_DIR="barcode_read_lists"
+
+mkdir -p "$OUTPUT_DIR"
+
+for PREDICTIONS_FILE in "$PREDICTIONS_DIR"/barcode_predictions_*.csv.gz; do
+    INDEX=${PREDICTIONS_FILE##*_}
+    INDEX=${INDEX%.csv.gz}
+    
+    gunzip -c "$PREDICTIONS_FILE" | \
+    awk -F',' '
+    NR==1 {next}  # Skip header
+    $2 != "-1" {  # Skip noise class
+        print $1 > "'$OUTPUT_DIR'/barcode_" $2 "_reads_" "'$INDEX'" ".txt"
+    }'
+done
+
+# Combine all files for each barcode across indices
+cd "$OUTPUT_DIR"
+for barcode_file in barcode_*_reads_*.txt; do
+    if [[ -f "$barcode_file" ]]; then
+        # Extract barcode number from filename
+        barcode_num=$(echo "$barcode_file" | sed 's/barcode_\([^_]*\)_reads_.*/\1/')
+        # Append to combined file
+        cat "$barcode_file" >> "barcode_${barcode_num}_all_reads.txt"
+    fi
+done
+
+rm barcode_*_reads_*.txt
+```
+
+Then, split the BAM file using the read ID lists and the `samtools` argument `-N`:
+```{bash}
+samtools view -b -N barcode_1_all_reads.txt -o barcode_1.bam BAM_FILE
+```
+
+
+
 ## Workflow Options
 #### Fingerprinting (preprocessing only)
 
@@ -204,7 +299,7 @@ See `warpdemux prep --help` for more information.
 #### Prediction Only (predict)
 Run barcode predictions on previously preprocessed fingerprints:
 
-```{bash}
+```{bash}-o ${POD5_DIR}
 warpdemux predict PREDICT_FROM_DIR
 ```
 Where `PREDICT_FROM_DIR` is the `/path/to/warpdemux/output` directory, containing the `command.json` file. You can only run this command if you have previously run the `prep` command.
